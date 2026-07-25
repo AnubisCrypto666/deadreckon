@@ -1,0 +1,24 @@
+# secrets
+.env
+*.token
+
+# python
+__pycache__/
+*.pyc
+.venv/
+dist/
+build/
+*.egg-info/
+
+# uv
+.uv-cache/
+
+# os
+.DS_Store
+
+# editors
+.vscode/
+.idea/
+
+# datahub local state
+.datahub/

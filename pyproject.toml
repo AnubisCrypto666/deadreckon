@@ -1,0 +1,11 @@
+[project]
+name = "deadreckon"
+version = "0.1.0"
+description = "Metadata-only agent that traces DataHub ML lineage and surfaces silent model risk"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
