@@ -3,7 +3,9 @@ name = "deadreckon"
 version = "0.1.0"
 description = "Metadata-only agent that traces DataHub ML lineage and surfaces silent model risk"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "acryl-datahub[datahub-rest,sqlalchemy]>=1.6.0.15",
+]
 
 [dependency-groups]
 dev = [

@@ -22,3 +22,6 @@ build/
 
 # datahub local state
 .datahub/
+
+# third-party fixtures fetched locally, not ours to redistribute
+.fixtures/
