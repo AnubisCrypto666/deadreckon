@@ -69,6 +69,80 @@ material for OSS doc-fix contributions.
   worked fine here, but worth pinning the client to match server version if
   it ever causes a real incompatibility.
 
+- 2026-07-26: **`seed/ml_lineage.py` written and run; Bramka 1 (spec plan-pracy-undertow.md
+  Sec.8) passes** - confirmed the agent can traverse dataset -> feature ->
+  training run -> model -> deployment through the MCP server's read tools.
+  Seeded 3 `mlFeatureTable`s (13 `mlFeature`s total), 3 `mlModelGroup`s,
+  5 `mlModel`s, 8 `dataProcessInstance` training runs (subtype
+  `MLFLOW_TRAINING_RUN`), wired into real tables from showcase-ecommerce
+  (Snowflake: customers/orders/order_items/order_details) and
+  nyc_taxi_pipeline (SQLite: raw_trips/staging_trips - the instance with the
+  seeded freshness gap, so `taxi_eta_predictor_v1`'s 4 nightly training runs
+  give D1 a genuine "trains nightly on a source frozen N days ago" signal
+  to detect later, not a fabricated one).
+
+  Two things had to be fixed along the way, both confirmed empirically
+  against the live Core instance rather than assumed from docs:
+
+  1. **`MLFeatureProperties.sources` rejects schemaField (column) URNs.**
+     Tried pointing a feature's `sources` at a specific upstream column via
+     `make_schema_field_urn(...)`; GMS returned a 422 - "Entity type for urn
+     ... is not a valid destination for field path: /sources/*". This field
+     only accepts dataset-level URNs (confirmed both from the compiled
+     schema's relationship annotation, `entityTypes: ["dataset"]`, and from
+     the runtime rejection), contradicting the plan's assumption that
+     `sources` could carry column-level provenance. Worked around by
+     pointing `sources` at the dataset and recording the specific source
+     column in the feature's `description` instead - still real
+     provenance, just not a lineage-graph edge.
+
+  2. **`mlModelDeployment` is effectively unreadable through this MCP
+     server** (mcp-server-datahub against DataHub Core 1.5.0.6). First
+     implementation created real `mlModelDeployment` entities (per spec
+     Sec.3) and linked them via `MLModelProperties.deployments`. Verification
+     found:
+     - `get_lineage`/`get_lineage_paths_between` from or to the model found
+       no edge to the deployment in either direction - the `deployments`
+       field's relationship (`DeployedTo`) isn't flagged `isLineage` in the
+       schema, so it never enters the lineage graph these tools walk.
+     - `get_entities` on the deployment URN itself returned "entity exists
+       but no data could be retrieved," and on the model returned only
+       `name`/`description`/`origin`/`platform` - none of
+       `hyperParams`/`trainingMetrics`/`mlFeatures`/`groups`/`trainingJobs`/
+       `deployments` came through, even though `get_lineage`'s facets prove
+       those relationships are correctly stored (inputs/outputs/processType
+       showed up there for the very same runs).
+     - `search(filter="entity_type = mlModelDeployment")` fails: the
+       GraphQL `EntityType` enum in this DataHub version has no matching
+       symbol (tried both `ML_MODEL_DEPLOYMENT` and `MLMODEL_DEPLOYMENT`).
+     - Separately, `datahub delete --hard` on one of the created
+       `mlModelDeployment` URNs failed with "STAGING is not an enum symbol"
+       for the `/origin` field of its own key - even though creating that
+       same entity with `env="STAGING"` had succeeded moments earlier via
+       the SDK. Write and delete disagree on the valid enum set for this
+       entity's key. Cleaned it up with `--soft` instead, which worked.
+
+     None of this is a bug in the seed data - `get_lineage`'s own facets
+     prove the underlying graph is correct. It's specifically that
+     `mlModelDeployment` has no working read path through the tools an
+     MCP-only agent has available. **Fix:** dropped `mlModelDeployment` as
+     an entity entirely; deployment status is now a structured property
+     (`urn:li:structuredProperty:deadreckon.deploymentEnvironment`, values
+     `PROD`/`STAGING`) directly on the `mlModel`. Confirmed this line
+     actually closes the gap: `get_entities` on a model returns
+     `structuredProperties` correctly (unlike the ML-specific property
+     fields above), the `add_structured_properties`/`remove_structured_properties`
+     MCP tools read/write it with no issue (matches the general mutation-tool
+     verification above), and it shows up inline in `get_lineage` results
+     too - confirmed by running `get_lineage` downstream from
+     `nyc_taxi_pipeline.raw_trips` at `max_hops=3`, which reached
+     `taxi_eta_predictor_v1` with `structuredProperties.deploymentEnvironment
+     = PROD` already attached in the same response, no second call needed.
+     This is a deliberate, documented departure from Sec.3 of the spec
+     (which lists `mlModelDeployment` as an entity to seed) - worth
+     upstreaming as a doc/behavior gap in `mcp-server-datahub` regardless
+     of what this project ends up doing.
+
 ## DataHub documentation issues found
 
 - `datahub init --username datahub --password datahub` run immediately after
