@@ -239,6 +239,179 @@ material for OSS doc-fix contributions.
      `mcp__datahub__get_entities` tool (not just the SDK), closing the
      loop end-to-end through the same interface Bramka 1 verified.
 
+- 2026-07-26: **Pre-push review of commit `f02f933`, plus follow-up fixes
+  found during that review.**
+
+  1. **Secret audit: clean.** Grepped the full diff of `f02f933` and the
+     entire git history (`git log --all -p`, all 6 commits) for
+     token/bearer/authorization/password/secret/api-key patterns, JWT-
+     shaped strings, and credential-embedded URLs (`user:pass@host`).
+     Zero real hits. The only matches were (a) the well-known local
+     quickstart default `datahub init --username datahub --password
+     datahub`, quoted in a doc-issue bullet, and (b) the already-masked
+     `eyJh**********t-_Q` token fragment quoted in the 2026-07-26 session
+     audit further down this file - both intentional documentation, not
+     leaked values. Confirmed separately that only `.env.example` (empty
+     `DATAHUB_GMS_TOKEN=` placeholder) was ever committed, never `.env`.
+     The real access token lives solely in `~/.datahubenv`, outside the
+     repo, and was independently confirmed (by Jacek, in his own
+     terminal) to never appear anywhere in git history.
+
+  2. **`undertow:at-risk` tag was unconditional - fixed.** Originally
+     applied to any model with >=1 finding, which for the current 5-model
+     seed meant all 5 got tagged (`riskScore` ranged 0.4-3.0 across them:
+     customer_churn_predictor_v1=1.0/MEDIUM, v2=3.0/HIGH,
+     order_value_predictor_v1=1.8/MEDIUM, taxi_eta_predictor_v1=2.4/HIGH,
+     taxi_fare_predictor_v1=0.4/LOW) - a wall of red tags reads as "flags
+     everything," not as a scoring agent. Fixed: `scoring.is_at_risk()`
+     gates the tag on severity != LOW (score >= 0.8, the existing MEDIUM
+     threshold, not a new number invented to make the demo look right) -
+     the document and both structured properties are still written for
+     *every* assessed model regardless (that's the data behind the
+     sorted risk table from spec Sec.2), only the visual tag is gated.
+     `writeback.set_at_risk_tag()` now also *removes* the tag when a
+     model's severity is LOW, so it tracks current state rather than
+     "was ever flagged" - verified by toggling `taxi_fare_predictor_v1`
+     (genuinely LOW/0.4) and confirming the tag actually disappears via
+     `get_entities` (no `tags` key at all afterward). 25/25 unit tests
+     pass (2 new: `is_at_risk` semantics).
+
+  3. **Idempotency of the full writeback path: confirmed, 3 consecutive
+     runs, no fix needed.** Ran `run_detectors.py` three times in a row;
+     checked raw aspects via the SDK (not just the resolved
+     `get_entities` view) after each run. Tag count stayed at 1 per
+     model, `structuredProperties` stayed at exactly 3 entries for
+     deployed models / 2 for the undeployed one (no duplicate
+     `propertyUrn`s), `relatedDocuments.total` stayed at 1 per model with
+     the same document URN each time, document content length stayed
+     constant (658 chars for taxi_eta_predictor_v1) with only the
+     `Assessed:`/`lastAssessedAt` timestamp advancing run over run.
+
+  4. **UI-visible latency for both writeback-facing screens: measured
+     directly in the browser (Jacek's own eyes, not MCP/SDK), <5s for
+     both, single combined write.** One write operation touched both
+     screens at once (`write_risk_assessment` for
+     `customer_churn_predictor_v1`, which updates its own `Properties`
+     tab, plus `set_at_risk_tag(taxi_fare_predictor_v1, True)`, which
+     changes list membership) - completed at 2026-07-26T18:44:29 UTC.
+     Both screens showed the change on the *first* manual refresh after
+     that timestamp:
+     - `mlModels/<urn>` profile page, **Properties** tab
+       (`lastAssessedAt`/`riskScore` - entity-by-URN GraphQL read, not
+       search-index-backed): **<5s**.
+     - Tag-filtered search (`/search?query=undertow%3Aat-risk`,
+       OpenSearch-backed `searchAcrossEntities`): **<5s** - went from 4
+       to 5 results (`taxi_fare_predictor_v1` present) on first refresh.
+     Followed up with 3 automated add/remove polling passes (1s interval)
+     directly against `searchAcrossEntities` on the same tag, to get a
+     *range* rather than one manually-observed point: 0.11s, 3.00s,
+     2.97s for the add transition to become visible; 1.66s, 2.98s, 2.99s
+     for remove. So the honest number for planning the demo video is
+     **up to ~3s, observed as low as ~0.1s** for this specific entity
+     count (5 ML models) and query shape - not the "several minutes" seen
+     earlier in this file for the full `datapack load` (1049 entities);
+     OpenSearch catch-up time scales with what changed and the total
+     index size, so this number is specific to writeback-scale changes on
+     this dataset, not a general constant. Good enough that a single
+     continuous take (run pipeline -> cut to UI -> refresh once) should
+     work for filming, but pad with one extra refresh as a safety margin
+     given the observed variance (0.1s-3s) rather than assuming the fast
+     end every time.
+
+  5. **`Model Risk Assessment` document has no working UI route at all in
+     this DataHub version - confirmed 404 from every path tried, not
+     fixable on our side, so the fix is a second, separate writeback that
+     carries the reasoning by value instead of by link.** Sequence of
+     what was actually checked, live, in the browser (Jacek's own eyes):
+     - Confirmed `relatedAssets` (used for the document, via
+       `createDocument`) and `institutionalMemory` (the classic
+       "Documentation"/"Links" tab) are two separate aspects/relationships
+       - `MLModel`'s GraphQL type exposes both `institutionalMemory` and
+         `relatedDocuments` as distinct fields, and a document attached
+         only via `relatedAssets` did not show up under the Documentation
+         tab.
+     - Added an `institutionalMemory` entry per assessed model (this
+       project's own writeback, not a DataHub document) whose `url`
+       originally pointed at a guessed direct document route,
+       `http://localhost:9002/documents/<urn>` - **confirmed 404**.
+     - The model's Documentation tab *does* show a native "Resources"
+       card for the document (via `relatedAssets`) with its title and an
+       "Edited .../by DataHub" byline - clicking it **also 404s**. So
+       neither a guessed direct URL nor the UI's own built-in link to the
+       same entity resolves to anything. This DataHub version's frontend
+       has no profile route for the standalone Document entity type at
+       all, through any path.
+     - **Fix**: `_finding_subject()` in `detectors/writeback.py` builds a
+       compact, detector-specific "what/where" clause from each finding's
+       *evidence* (not by truncating the long prose `summary`), and the
+       `institutionalMemory` entry's `description` is
+       `[deadreckon] {severity} risk={score} | {detector}: {subject}` -
+       severity, score, and detector code always land in the first ~35
+       characters, well before the panel's own truncation point (observed
+       description lengths ranged 79-123 chars across all 5 models, and
+       the critical prefix is never what gets cut). The entry's `url` was
+       changed to point at the tag-filtered search list instead
+       (`/search?query=undertow%3Aat-risk`, already confirmed working and
+       <5s per the latency measurement above) - somewhere that actually
+       resolves, rather than linking to a 404. Confirmed live in the UI:
+       the summary now renders directly in the model's right-hand Summary
+       panel with no click required (this was the actual ask - "sędzia
+       klikający po UI musi ją zobaczyć" - and it's now true without
+       depending on the broken document route at all). Dedup keys on our
+       own `[deadreckon]` marker prefix in the description, not on `url`
+       (the url value itself changed once already during this fix, so
+       keying on it would have left the old, dead link behind as a stale
+       duplicate entry) - verified via the SDK that every model has
+       exactly 1 `institutionalMemory` element after the fix, not 2.
+     - **This is the fourth confirmed instance of the same pattern**
+       (after `mlModelDeployment`'s unreadable relationships,
+       `get_entities`/`get_lineage` dropping native fields for `mlModel`/
+       `mlFeature`/`dataProcessInstance`): an MCP/SDK-level write succeeds
+       and is readable via the API, but the product surface a judge
+       actually clicks through cannot show it at all. This is the
+       strongest candidate for the OSS issue in spec Sec.6 - see the TODO
+       below, material to prepare (not send) next.
+     - The Document entity itself is left as-is (still saved, still
+       correctly attached via `relatedAssets`, still fully readable via
+       `get_entities`/`grep_documents`/direct URN fetch) - it's still a
+       real, valid writeback per spec Sec.5, just not one a UI-only judge
+       will ever click into successfully in this DataHub version.
+     - Deliberately did **not** touch the model's own `editableProperties`
+       (description) to work around this - that field is the asset
+       owner's description, ours to read, not to overwrite for a
+       demo-convenience shortcut. `institutionalMemory` is a separate,
+       additive aspect for exactly this kind of note, which is why it was
+       used instead.
+
+  6. **`customer_churn_predictor_v1` showing fabric `PROD` in its own URN
+     while `deadreckon.deploymentEnvironment` says `STAGING` is not a
+     data bug - it's a vocabulary collision, and it was fixed by renaming
+     our property, not the data.** `seed/ml_lineage.py` sets `FABRIC =
+     "PROD"` as a blanket constant for every ML entity's URN (`origin`
+     key field) - this is DataHub's *catalog* environment (which
+     metadata instance this describes: prod catalog vs a dev/test one),
+     deliberately uniform across all our seeded entities since there's
+     only one DataHub instance here, not five. It has nothing to do with
+     where a given model is actually served, which is exactly what the
+     separate `deadreckon.deploymentEnvironment` structured property
+     tracks (and needs `MULTIPLE` cardinality, since unlike fabric - 1:1
+     with the URN - a real model could be live in more than one serving
+     environment at once). The confusion is that DataHub's own UI labels
+     fabric as "Environment" too (visible in `get_lineage`'s own facets:
+     `"field":"origin","displayName":"Environment"`), so a judge sees
+     "Environment: PROD" (fabric, from the URN) right next to our
+     property, and if *our* property were also called "Environment" (or
+     even "Deployment Environment", close enough to read as the same
+     concept), the two disagreeing looks like a data error instead of two
+     orthogonal, both-correct facts. Fixed by renaming the structured
+     property's `displayName` from "Deployment Environment" to
+     "Undertow Serving Stage" (qualifiedName unchanged:
+     `deadreckon.deploymentEnvironment`, so no data migration needed -
+     `StructuredPropertyDefinitionClass` re-emission just updates the
+     label) and tightening its `description` to spell out the distinction
+     explicitly. Worth saying out loud in the video script too, since a
+     judge who spots this before reading the tooltip will ask.
+
 ## DataHub documentation issues found
 
 - `datahub init --username datahub --password datahub` run immediately after
@@ -380,6 +553,26 @@ material for OSS doc-fix contributions.
   project plants its own `deadreckon.schemaChangedAt`/
   `deadreckon.definitionChangedAt` structured properties instead (see
   `seed/inject_faults.py`).
+
+- The standalone `Document` entity (created via `save_document`/
+  `createDocument`) has **no working profile route anywhere in this
+  DataHub version's frontend** - confirmed 404 two independent ways: a
+  direct URL guess (`/documents/<urn>`) and the UI's own native
+  "Resources" card on the model it's attached to via `relatedAssets`
+  (which links to the exact same dead route). The entity is fully
+  writable (MCP `save_document`) and fully readable via the API
+  (`get_entities`, `grep_documents`, direct URN fetch, `relatedDocuments`
+  on the attached asset) - it just cannot be opened by clicking through
+  the product. This is the fourth confirmed instance of the same
+  pattern in this project (after `mlModelDeployment`'s unreadable
+  relationships and `get_entities`/`get_lineage` dropping native fields
+  for `mlModel`/`mlFeature`/`dataProcessInstance`, both above): an
+  agent-facing write succeeds and round-trips through the API, but nothing
+  in the actual product can display it. Worth an upstream fix (a real
+  Document profile page) or, short of that, a docs note that Documents
+  are API/MCP-only in this version and should be surfaced via
+  `institutionalMemory`/tags/properties on the entities they're attached
+  to if a human needs to see them in the UI.
 
 ## Audyt sesji 2026-07-26
 
@@ -533,3 +726,9 @@ komendy — tego też nie widzę).
   "Audyt sesji 2026-07-26"). Sam token nigdy nie wyciekł w pełnej postaci, ale
   to tania, standardowa higiena przed publikacją repo - zrobić na końcu, nie
   teraz, żeby nie przerywać obecnego tokenu w środku prac.
+  Dodatkowa weryfikacja 2026-07-26 (audyt przed pushem commita f02f933):
+  pełna wartość tokenu żyje wyłącznie w `~/.datahubenv`, poza repo, i nigdy
+  nie trafiła do historii gita w żadnej postaci - potwierdzone zarówno przez
+  grep całej historii (`git log --all -p`) pod kątem wzorców tokenu/JWT/
+  URL-i z credentialami (zero trafień poza zamaskowanym `eyJh**********t-_Q`
+  cytowanym w tym samym audycie), jak i niezależnie przez Ciebie w terminalu.

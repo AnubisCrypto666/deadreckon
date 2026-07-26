@@ -1,5 +1,5 @@
 from detectors.models import Finding, ModelSnapshot
-from detectors.scoring import blast_radius, score_model, severity_for
+from detectors.scoring import blast_radius, is_at_risk, score_model, severity_for
 
 MODEL_URN = "urn:li:mlModel:m"
 
@@ -52,3 +52,15 @@ def test_undeployed_d3_is_low_severity():
     result = score_model(_model(()), [Finding(detector="D3", model_urn=MODEL_URN, summary="s")])
     assert result is not None
     assert result.severity == "LOW"
+
+
+def test_only_medium_and_high_are_taggable():
+    assert is_at_risk("HIGH") is True
+    assert is_at_risk("MEDIUM") is True
+    assert is_at_risk("LOW") is False
+
+
+def test_undeployed_model_is_not_taggable_even_with_a_finding():
+    result = score_model(_model(()), [Finding(detector="D2", model_urn=MODEL_URN, summary="s")])
+    assert result is not None
+    assert is_at_risk(result.severity) is False

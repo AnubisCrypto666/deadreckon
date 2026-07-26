@@ -37,6 +37,21 @@ SEVERITY_THRESHOLDS = (
     ("MEDIUM", 0.8),
 )
 
+# Which severities are worth the `undertow:at-risk` tag - i.e. worth a
+# visual flag an owner has to act on, not just a recorded score. LOW is
+# everything below the MEDIUM threshold (0.8): either an undeployed model
+# at any detector weight (max 1.0 x 0.5 = 0.5 - nothing is serving yet, so
+# there's no live blast radius to page anyone about), or a model deployed
+# only to STAGING with nothing but a D3 (softest, semantic-only) finding
+# (0.6 x 1.0 = 0.6). Both are real findings worth recording (the document
+# and structured properties are written regardless), just not worth the
+# same visual alarm as a PROD model or a harder D1/D2 signal.
+TAGGABLE_SEVERITIES = frozenset({"MEDIUM", "HIGH"})
+
+
+def is_at_risk(severity: str) -> bool:
+    return severity in TAGGABLE_SEVERITIES
+
 
 @dataclass(frozen=True)
 class ModelRiskScore:

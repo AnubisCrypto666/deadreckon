@@ -249,15 +249,26 @@ def emit_feature_tables(graph) -> None:
 
 
 def emit_deployment_env_property_definition(graph) -> None:
+    # displayName is deliberately NOT "Deployment Environment"/"Environment":
+    # every seeded entity's URN also carries a DataHub fabric/env segment
+    # (origin=PROD here, uniformly, since this is one catalog instance),
+    # and DataHub's own UI labels that fabric field "Environment" too (see
+    # get_lineage's own facets). A model can legitimately show URN fabric
+    # PROD next to this property saying STAGING - that's two different,
+    # both-correct facts (catalog instance vs. actual serving stage), not
+    # a data bug - but only if the labels don't collide. See NOTES.md.
     graph.emit(MetadataChangeProposalWrapper(
         entityUrn=DEPLOYMENT_ENV_PROPERTY_URN,
         aspect=StructuredPropertyDefinitionClass(
             qualifiedName="deadreckon.deploymentEnvironment",
-            displayName="Deployment Environment",
+            displayName="Undertow Serving Stage",
             description=(
-                "Environment(s) this ML model is currently deployed to. Denormalized "
-                "onto the model itself rather than modeled as a separate "
-                "mlModelDeployment entity - see NOTES.md for why."
+                "Environment(s) this ML model is actually served from, as tracked "
+                "by deadreckon - independent of this entity's own URN fabric/env "
+                "segment (which is DataHub's catalog instance designator, always "
+                "PROD here since there's one DataHub instance, not one per serving "
+                "stage). Denormalized onto the model itself rather than modeled as "
+                "a separate mlModelDeployment entity - see NOTES.md for why."
             ),
             valueType="urn:li:dataType:datahub.string",
             entityTypes=["urn:li:entityType:datahub.mlModel"],

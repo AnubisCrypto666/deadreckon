@@ -16,7 +16,7 @@ from datahub.ingestion.graph.client import get_default_graph
 from detectors import d1_frozen_source, d2_schema_drift, d3_semantic_drift
 from detectors.fetch import fetch_all_model_snapshots, fetch_dataset_snapshots
 from detectors.models import Finding, ModelSnapshot
-from detectors.scoring import score_model
+from detectors.scoring import is_at_risk, score_model
 from detectors.writeback import ensure_writeback_definitions, write_risk_assessment
 
 
@@ -73,7 +73,8 @@ def main() -> None:
 
         if not args.dry_run:
             doc_urn = write_risk_assessment(graph, model, risk, now)
-            print(f"  -> wrote {doc_urn}, tagged undertow:at-risk, set riskScore/lastAssessedAt")
+            tag_note = "tagged undertow:at-risk" if is_at_risk(risk.severity) else "not tagged (below MEDIUM)"
+            print(f"  -> wrote {doc_urn}, {tag_note}, set riskScore/lastAssessedAt")
 
     if not any_findings:
         print("No findings across any model.")
