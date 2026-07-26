@@ -143,6 +143,102 @@ material for OSS doc-fix contributions.
      upstreaming as a doc/behavior gap in `mcp-server-datahub` regardless
      of what this project ends up doing.
 
+- 2026-07-26: **D1-D3 detectors, scoring, and writeback implemented and
+  verified end-to-end against the live Core instance** (`detectors/`,
+  `run_detectors.py`, `seed/inject_faults.py`). Architecture decision made
+  along the way, with a follow-up empirical finding that justifies it:
+
+  1. **The detector *pipeline* reads via the DataHub Python SDK/GraphQL
+     directly, not through mcp-server-datahub's `get_entities`/
+     `get_lineage` tools**, because those tools' field projections for
+     `mlModel`, `mlFeature`, and `dataProcessInstance` are incomplete in
+     exactly the way already documented above for `mlModelDeployment`.
+     Confirmed empirically: `mcp__datahub__get_entities` on an `mlModel`
+     URN returns only `name`/`description`/`origin`/`platform`/
+     `structuredProperties` (no `hyperParams`, `trainingMetrics`,
+     `mlFeatures`, `groups`, `trainingJobs`); on an `mlFeature` URN only
+     `name`/`description` (no `sources`, `dataType`, `customProperties`);
+     on a `dataProcessInstance` URN, nothing but the bare `urn`.
+     `mcp__datahub__get_lineage` shows `dataProcessInstance` training-run
+     nodes as bare stubs too (urn/type only, no timestamp). All of this
+     data *is* present and fully queryable via raw GraphQL/the SDK
+     (`execute_graphql`, `get_aspect`) - confirmed by fetching the exact
+     same URNs directly and getting full fidelity back, including
+     `DataProcessInstance.state` (run timestamps, via GraphQL) and
+     dataset `schemaMetadata`/`viewProperties.logic`/`operations`
+     (freshness), all of which came through the MCP tool fine for plain
+     `dataset` entities but not for these three ML-specific ones. So
+     `structuredProperties` remains the one field proven to project
+     correctly through the MCP tool for *every* entity type tested so
+     far (dataset, mlModel) - which is why every value a detector needs
+     to compare programmatically (deployment environment, schema-changed-
+     at, definition-changed-at, and now risk score/last-assessed-at) is
+     written as a structured property rather than relying on the
+     entity's own native fields, even where those native fields exist
+     and are semantically the "right" place for the data (e.g.
+     `SchemaMetadataClass.lastModified`, which exists on the aspect but
+     isn't exposed by DataHub's GraphQL schema for `SchemaMetadata` at
+     all - only `createdAt` is, and its update-on-rewrite semantics
+     weren't verified, so this project doesn't rely on it either).
+     Bramka 1's own binary criterion (an interactive MCP client can walk
+     dataset -> feature -> training run -> model) is unaffected by this -
+     it's already satisfied and stays true. This is specifically about
+     what a *headless, automated* pipeline can rely on this MCP server
+     version to read back reliably, which turns out to be narrower.
+
+  2. **Writeback for the "Model Risk Assessment" document goes through
+     the same GraphQL mutations `save_document` uses under the hood**
+     (`createDocument`, `updateDocumentContents`, `relatedAssets`),
+     called directly via `execute_graphql` so the pipeline runs headlessly
+     without an LLM in the loop for every write. Confirmed empirically:
+     `createDocument` with a caller-supplied `id` fails cleanly with
+     "Document with ID ... already exists" on a second call with the same
+     id (not a silent no-op or a duplicate) - `run_detectors.py` catches
+     that specific error and falls back to `updateDocumentContents`,
+     verified idempotent by re-running the full pipeline twice and
+     observing `lastAssessedAt` and the document body both advance to the
+     second run's timestamp. Also found in the same exploration: a
+     `deleteDocument` GraphQL mutation exists (no equivalent tool is
+     exposed by this MCP server, consistent with the no-delete-tool gap
+     already noted above for `save_document`) - confirmed it sets
+     `status.removed = true` and correctly disappears from
+     `search_documents`/`searchAcrossEntities`, i.e. it's a **soft**
+     delete with the exact same semantics as `datahub delete --soft`
+     (content still readable by direct URN fetch afterward). Nicer than
+     shelling out to the CLI for cleaning up scratch/test documents going
+     forward, but not a hard purge - same caveat as before.
+
+  3. **Fault injection for D2/D3, disclosed per Sec.3's honesty rule**
+     (`seed/inject_faults.py`, idempotent, anchored like the other seed
+     scripts): D2 renames `credit_limit` -> `credit_limit_usd` on the
+     showcase-ecommerce `customers` table (Snowflake) and records a
+     `deadreckon.schemaChangedAt` structured property (3 days ago) on
+     that dataset; D3 edits the `discount_percent` calculation in the
+     dbt `order_details` model's `viewLogic` from "percent of list price"
+     to "percent of unit price" - same column name and type, different
+     number - and records `deadreckon.definitionChangedAt` (9 days ago)
+     on that dbt dataset. Both timestamps are planted rather than derived
+     from DataHub's own aspect history, per the finding above (schema/
+     view-logic versioning isn't reliably readable through this MCP
+     server either).
+
+  4. **End-to-end run against the live Core instance produced the
+     expected mix of positive and negative findings**, including the
+     specific negative control the fault injection was designed to
+     produce: `customer_churn_predictor_v2` (PROD, last trained 5 days
+     ago, *after* the 9-days-ago D3 definition change) correctly gets
+     only a D2 finding, not D3 - while `customer_churn_predictor_v1`
+     (STAGING, superseded, last trained 46 days ago) and
+     `order_value_predictor_v1` (PROD, last trained 11 days ago) both get
+     flagged for D3, since both trained before the change. This
+     confirms the date-comparison logic in `d3_semantic_drift.py`
+     isn't just "flag anything touching this dataset" - it actually
+     distinguishes retrained-after-the-fact from still-stale. Full
+     writeback (tag + both structured properties + related document) was
+     then confirmed readable back through the *actual*
+     `mcp__datahub__get_entities` tool (not just the SDK), closing the
+     loop end-to-end through the same interface Bramka 1 verified.
+
 ## DataHub documentation issues found
 
 - `datahub init --username datahub --password datahub` run immediately after
@@ -258,6 +354,32 @@ material for OSS doc-fix contributions.
   `GlobalTagsClass`/`GlossaryTermsClass` per table. Worth a PR upstream —
   `attach_tags`/`attach_glossary` need to batch by entity, not by
   (tag, entity) pair.
+
+- `mcp-server-datahub`'s `get_entities`/`get_lineage` tools drop most
+  native fields for `mlModel`, `mlFeature`, and `dataProcessInstance`
+  entities specifically (see the 2026-07-26 detector-pipeline entry under
+  Verification results above for the exact fields missing and how this
+  was confirmed against raw GraphQL/the SDK returning the same data in
+  full). This is the same class of read gap already found for
+  `mlModelDeployment`, just for entity types this project still relies on
+  rather than one it dropped - worth upstreaming as a documented
+  limitation of the tool (or a fix to its entity-type-specific response
+  builders) rather than something an agent should have to discover by
+  trial and error per entity type.
+
+- DataHub's GraphQL schema exposes `SchemaMetadata.createdAt` but no
+  `lastModified`/`created` audit stamp, even though the underlying
+  `SchemaMetadataClass` PDL aspect has both fields (`created`,
+  `lastModified`, `deleted`, all `AuditStampClass`). Same gap for
+  `ViewProperties` - no timestamp field at all in the GraphQL type. This
+  means there is no metadata-graph-native way to answer "when did this
+  schema/view definition last change" through GraphQL (and therefore
+  through mcp-server-datahub, which sits on top of it) even though
+  DataHub versions these aspects internally on every write. Worth an
+  upstream doc note or GraphQL schema addition - absent that, this
+  project plants its own `deadreckon.schemaChangedAt`/
+  `deadreckon.definitionChangedAt` structured properties instead (see
+  `seed/inject_faults.py`).
 
 ## Audyt sesji 2026-07-26
 
