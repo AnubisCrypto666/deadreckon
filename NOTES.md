@@ -11,7 +11,63 @@ material for OSS doc-fix contributions.
 
 ## Verification results
 
-(filled in as milestones close — see plan §4 "do zweryfikowania w dniu 1")
+- 2026-07-26: **Mutation flag verified — the MCP server's mutation tools work
+  on DataHub Core**, not Cloud-only, resolving the ambiguity flagged in
+  plan-pracy-undertow.md §5. Confirmed empirically by round-tripping every
+  exposed mutation tool against the local Core quickstart, on a clean
+  dataset (`nyc_taxi.main.v_staging_from_raw`, a view with no pre-existing
+  tags/terms/owner/domain/description), verifying persistence with
+  `get_entities` after each write, then reverting:
+  - `add_tags`/`remove_tags` — works, but the tag URN must already exist as
+    an entity in the graph first; passing an unregistered tag URN (tried
+    `urn:li:tag:mcp_verify_test`) fails with GraphQL `BAD_REQUEST` ("Urn
+    does not exist"). There is no `create_tag`-equivalent mutation tool
+    exposed here, so brand-new tags/terms still need to be created via the
+    Python SDK or UI before `add_tags`/`add_terms` can attach them to
+    entities.
+  - `add_terms`/`remove_terms` — works against an existing glossary term
+    (`pipeline_stage`).
+  - `add_owners`/`remove_owners` — works
+    (`urn:li:corpuser:datahub`, `TECHNICAL_OWNER`).
+  - `update_description` (`replace` then `remove`) — works, entity-level.
+  - `set_domains`/`remove_domains` — works against an existing domain.
+  - `add_structured_properties`/`remove_structured_properties` — works
+    against an existing structured property definition
+    (`urn:li:structuredProperty:showcase.dataQualityScore`).
+  - `save_document` — works; created
+    `urn:li:document:shared-793bb593-a8ae-4f14-8051-b90741667b59`
+    ("MCP verify test — safe to delete"), confirmed via `grep_documents`.
+    No delete/remove-document tool exists in this MCP server; see the
+    cleanup convention below for how it was removed afterward.
+
+  **Conclusion:** writeback for the spec's §5 plan (`save_document` for Model
+  Risk Assessment docs, `add_tags` for `undertow:at-risk`,
+  `add_structured_properties` for risk score/last-assessed date) can go
+  straight through the MCP mutation tools — no fallback to the Python SDK
+  path is needed. Caveat: any brand-new tag/structured-property *definitions*
+  not yet registered in DataHub must still be created via SDK/UI first; the
+  MCP tools only attach/detach references to definitions that already exist.
+
+  **Cleanup convention for test documents:** the MCP server has no
+  `remove_document`/delete tool, so any throwaway `save_document` output
+  (like the "MCP verify test — safe to delete" doc above,
+  `urn:li:document:shared-793bb593-a8ae-4f14-8051-b90741667b59`) is removed
+  via the `datahub` CLI instead:
+  `datahub delete --urn "<document urn>" --soft`.
+  Confirmed this actually hides it from normal discovery: after running it
+  on the test doc, `search_documents` (the same path UI search / Ask
+  DataHub use) returned 0 matches for it. Note it's a *soft* delete only —
+  it sets the entity's `status` aspect to removed but doesn't purge the
+  underlying aspects, so a tool that fetches by URN directly
+  (`grep_documents`, `get_entities`) can still read its content afterward.
+  Good enough for hiding scratch verification docs from the UI; use
+  `datahub delete --urn ... --hard` instead if a test entity's data must be
+  fully purged, not just hidden.
+  Side note: this CLI (`acryl-datahub` 1.6.0.15 in `.venv`) is one minor
+  version ahead of the quickstart server (1.5.0.6) and prints a
+  client/server incompatibility warning on every invocation; delete still
+  worked fine here, but worth pinning the client to match server version if
+  it ever causes a real incompatibility.
 
 ## DataHub documentation issues found
 
