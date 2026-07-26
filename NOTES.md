@@ -258,3 +258,156 @@ material for OSS doc-fix contributions.
   `GlobalTagsClass`/`GlossaryTermsClass` per table. Worth a PR upstream —
   `attach_tags`/`attach_glossary` need to batch by entity, not by
   (tag, entity) pair.
+
+## Audyt sesji 2026-07-26
+
+Poniżej pełny, dosłowny przegląd tej sesji Claude Code, dla drugiego
+asystenta oceniającego zgodność z PROMPT A z `plan-pracy-undertow.md`.
+Zakres pracy tej sesji: dokończenie weryfikacji mutacji MCP, usunięcie
+testowego dokumentu, `seed/ml_lineage.py` i weryfikacja Bramki 1. Poniżej
+tylko fakty, bez oceny.
+
+### 1. Komendy shell dotykające plików spoza katalogu repo (`.../deadreckon`)
+
+- `cat "/Users/jacek/.claude/projects/-Users-jacek-Documents-DataHub-The-Agent-Hackathon/memory/MEMORY.md"` —
+  próba odczytu pliku pamięci Claude Code (katalog opisany w moim system
+  prompcie jako właściwe miejsce na tego typu dane, poza repo projektu).
+  Plik nie istniał (exit code 1), nic nie odczytano.
+- `ls -la "/Users/jacek/.claude/projects/-Users-jacek-Documents-DataHub-The-Agent-Hackathon/memory/"` —
+  listing tego samego katalogu pamięci; był pusty.
+- `ls -la "/Users/jacek/Documents/DataHub The Agent Hackathon"` — listing
+  katalogu nadrzędnego wobec repo (zawiera repo `deadreckon` jako
+  podkatalog plus dwa pliki planu i `.claude/`).
+- `ls -la "/Users/jacek/Documents/DataHub The Agent Hackathon/.claude"` —
+  listing katalogu `.claude` na poziomie nadrzędnym (poza repo); pokazał
+  tylko nazwę/rozmiar pliku `settings.local.json` (164 B), **treść tego
+  pliku nigdy nie została odczytana**.
+- `grep -n "zweryfikowa\|weryfikac" ".../plan-pracy-datahub-agent-hackathon.md"` —
+  plik poza repo (katalog nadrzędny), tylko odczyt/grep, bez modyfikacji.
+- `grep -n -i "weryf\|§4\|dnia 1\|dzień 1\|mcp" ".../plan-pracy-datahub-agent-hackathon.md" | head -60` —
+  jw., odczyt/grep poza repo.
+- `grep -n -i "zweryf\|verif" ".../plan-pracy-datahub-agent-hackathon.md" ".../plan-pracy-undertow.md"` —
+  jw., dwa pliki poza repo, tylko grep.
+- `Read` (narzędzie, nie Bash) na `.../plan-pracy-undertow.md`, dwukrotnie
+  (linie 1–80, potem 80–140) — plik poza repo, tylko odczyt.
+- `cat ~/.datahubenv; env | grep -i datahub; cat ".../deadreckon/.env.example"` —
+  **ta komenda została ODRZUCONA przez Ciebie przed wykonaniem** (permission
+  prompt), nic się nie wykonało. Zobacz sekcję 3 — to najważniejszy fakt
+  tego audytu.
+- `[ -f ~/.datahubenv ]` (test istnienia pliku, bez odczytu treści) oraz
+  `printenv "$v" >/dev/null 2>&1` dla `DATAHUB_GMS_TOKEN`/`DATAHUB_GMS_URL`
+  (przekierowane do `/dev/null`, więc wartość — gdyby istniała — nigdy nie
+  trafiła do mojego outputu) — wykonane na Twoją wyraźną prośbę, po tym jak
+  odrzuciłeś powyższą próbę `cat`. Wynik: oba env var "not set", plik
+  istnieje ("exists (not reading contents)").
+- `find / -maxdepth 6 -iname "datahub-project" 2>/dev/null | head` —
+  **przeszukanie systemu plików od katalogu głównego `/`** (ograniczone do
+  głębokości 6, tylko dopasowanie nazw, `2>/dev/null` tłumi błędy
+  uprawnień). Nic nie znaleziono (pusty wynik). To jedyna komenda w tej
+  sesji, która przeszukiwała system plików poza katalogiem roboczym.
+- Wewnętrzne odczyty `~/.datahubenv` przez bibliotekę `datahub` (SDK/CLI),
+  NIE przeze mnie bezpośrednio: za każdym razem, gdy uruchamiałem
+  `datahub delete ...` (6 razy) albo skrypt Python używający
+  `get_default_graph()` (3 razy: test `schemaField` w `mlFeature.sources`,
+  `seed/ml_lineage.py` dwukrotnie, plus jednorazowy skrypt tworzący
+  structured property), biblioteka sama odczytywała `~/.datahubenv`, żeby
+  się uwierzytelnić do `localhost:8080`. Nigdy nie zrobiłem tego przez
+  `Read`/`cat` na tym pliku — zob. sekcję 3 co do tego, co z tego trafiło
+  do mojego outputu.
+- Plik-zrzut wyniku narzędzia utworzony automatycznie przez system
+  (nie przeze mnie, nie przez `Write`) pod
+  `/Users/jacek/.claude/projects/-Users-jacek-Documents-DataHub-The-Agent-Hackathon/7b9c2aba-8814-4bbb-bc77-9722d4e9e564/tool-results/mcp-datahub-get_entities-1785044716331.txt` —
+  jeden `get_entities` zwrócił wynik przekraczający limit tokenów; harness
+  sam zapisał go do tego pliku (poza repo). Odczytałem go potem przez
+  `jq -r '...' "<ta ścieżka>"` (dwukrotnie, różne zapytania `jq`), nigdy nie
+  modyfikowałem.
+- Wszystkie pozostałe komendy Bash w tej sesji (git, python3 -c
+  introspekcja `datahub` w `.venv`, `pip show`, `find .venv ...`,
+  uruchomienia skryptów `seed/*.py`) operowały wyłącznie wewnątrz
+  `.../deadreckon` (repo lub jego `.venv`).
+
+### 2. Uprawnienia, o które prosiłem, i ich zakres
+
+Nie mam wglądu w to, jaki zakres zgody wybrałeś w oknie uprawnień (czy
+kliknąłeś "tak, tylko tym razem" czy "tak, zawsze zezwalaj na X") — z mojej
+strony widoczne jest wyłącznie to, czy wywołanie narzędzia się powiodło,
+czy zostało odrzucone. Jedyne odrzucenie w całej sesji to `cat ~/.datahubenv`
+opisane w sekcji 1 i 3 — po nim sam poprosiłeś mnie o bezpieczniejszą wersję
+komendy, którą wykonałem. Nie proponowałem ani nie prosiłem o żadne trwałe
+rozszerzenie uprawnień (np. "zawsze zezwalaj na Bash bez potwierdzenia",
+"zawsze zezwalaj na odczyt plików spoza repo") — każde wywołanie narzędzia
+w tej sesji było pojedynczym, konkretnym poleceniem z własnym promptem
+uprawnień (o ile Twoja konfiguracja w ogóle o niego pyta dla danego typu
+komendy — tego też nie widzę).
+
+### 3. Miejsca, gdzie potencjalnie mógł przejść przeze mnie sekret
+
+- **Zablokowana próba (nie wykonała się):** `cat ~/.datahubenv; env | grep
+  -i datahub; ...`. Gdyby się wykonała i gdyby w środowisku powłoki był
+  ustawiony np. `DATAHUB_GMS_TOKEN`, `env | grep -i datahub` wypisałby jego
+  **pełną, niezamaskowaną wartość** do mojego outputu. Odrzuciłeś to, zanim
+  się wykonało — token (jeśli był w env) nigdy do mnie nie trafił tą drogą.
+- **Zamaskowany token w logach CLI (7 wystąpień):** każde wywołanie
+  `datahub delete --urn ...` (soft/hard) drukuje na stdout linię w stylu
+  `Using DataHubGraph: configured to talk to http://localhost:8080 with
+  token: eyJh**********t-_Q` — maskowanie robi sam CLI, nie ja. Ten
+  identyczny zamaskowany fragment (`eyJh**********t-_Q`) pojawił się w
+  wynikach narzędzi, które przetworzyłem, dokładnie 7 razy: usunięcie
+  testowego dokumentu (soft), usunięcie testowej `mlFeature` (hard), 4×
+  usunięcie encji `mlModelDeployment` (hard, w pętli), 1× ponowna próba tej
+  samej encji (soft). Widoczne jest tylko pierwsze 4 i ostatnie 4 znaki
+  base64 (`eyJh` = standardowy początek nagłówka JWT, `t-_Q` = końcówka) —
+  środek jest gwiazdkami. Pełna wartość tokenu nigdy nie pojawiła się w
+  żadnym outpucie, który widziałem.
+- **Odczyt `~/.datahubenv` przez SDK bez wyświetlenia treści:** opisane w
+  sekcji 1 — `get_default_graph()` i `datahub` CLI czytają ten plik
+  wewnętrznie, żeby się uwierzytelnić; żadna z tych operacji nie zwróciła
+  mi treści pliku ani pełnego tokenu w odpowiedzi narzędzia.
+- Nieudana próba surowego zapytania HTTP (`urllib.request` w Pythonie) do
+  `http://localhost:8080/aspects/...` bez tokenu — zakończona `401
+  Unauthorized`, żaden sekret nie został użyty ani ujawniony (bo go tam
+  nie podałem).
+- Brak innych miejsc w tej sesji, gdzie hasło/klucz/token mogłyby
+  przechodzić przez argumenty komend, zmienne środowiskowe wypisywane
+  wprost, czy logi — poza powyższymi trzema przypadkami.
+
+### 4. Pliki utworzone/zmodyfikowane POZA repo projektu
+
+- **Utworzone/zmodyfikowane przeze mnie bezpośrednio: żadne.** Wszystkie
+  moje `Write`/`Edit` w tej sesji dotyczyły plików wewnątrz
+  `.../deadreckon` (`NOTES.md`, `seed/ml_lineage.py`).
+- **Utworzony automatycznie przez system (nie przeze mnie):** plik-zrzut
+  `tool-results/mcp-datahub-get_entities-1785044716331.txt` pod
+  `~/.claude/projects/-Users-jacek-Documents-DataHub-The-Agent-Hackathon/7b9c2aba-8814-4bbb-bc77-9722d4e9e564/tool-results/`
+  — opisany w sekcji 1, efekt uboczny zbyt dużego wyniku narzędzia
+  `get_entities`, zapisany przez harness Claude Code, nie przeze mnie
+  wprost. Tylko odczytany (`jq`), nie modyfikowany.
+- Katalog scratchpad wskazany w moim system prompcie
+  (`/private/tmp/claude-501/.../scratchpad`) — **nie użyty w ogóle** w tej
+  sesji.
+- Poza DataHub (dane w bazie grafu, nie pliki) i repo `deadreckon`, nie
+  utworzyłem ani nie zmodyfikowałem żadnych innych plików na tej maszynie.
+
+### 5. Połączenia sieciowe/API poza DataHub (localhost) i GitHub
+
+- **Nie znaleziono żadnych.** Wszystkie wywołania sieciowe w tej sesji
+  szły albo do DataHub GMS na `http://localhost:8080` (przez narzędzia
+  `mcp__datahub__*`, przez `datahub` CLI, przez Python SDK
+  `get_default_graph()`/`DatahubRestEmitter`, oraz jedno bezpośrednie
+  zapytanie `urllib` opisane w sekcji 3), albo do GitHub przez `git push`
+  na `https://github.com/AnubisCrypto666/deadreckon.git` (na Twoje
+  wyraźne polecenie "push it", dwa razy w tej sesji).
+- `ToolSearch` (ładowanie schematów narzędzi MCP) i `AskUserQuestion` to
+  wewnętrzne mechanizmy harnessu Claude Code, nie połączenia do zewnętrznych
+  usług w rozumieniu tego audytu.
+- Nie wywołałem `WebFetch` ani `WebSearch` ani żadnego innego serwera MCP
+  poza `datahub` w tej sesji.
+
+## TODO przed finalną wysyłką (8 sierpnia)
+
+- Rotacja tokenu DataHuba: wygenerować nowy access token, unieważnić obecny
+  (ten używany w tej sesji). Powód: zamaskowane fragmenty tokenu (eyJh...t-_Q)
+  przewinęły się przez logi CLI kilkukrotnie podczas developmentu (patrz sekcja
+  "Audyt sesji 2026-07-26"). Sam token nigdy nie wyciekł w pełnej postaci, ale
+  to tania, standardowa higiena przed publikacją repo - zrobić na końcu, nie
+  teraz, żeby nie przerywać obecnego tokenu w środku prac.
