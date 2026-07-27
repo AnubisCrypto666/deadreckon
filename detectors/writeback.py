@@ -62,7 +62,7 @@ from datahub.metadata.schema_classes import (
 )
 
 from detectors.models import Finding, ModelSnapshot
-from detectors.scoring import ModelRiskScore, is_at_risk
+from detectors.scoring import MAX_POSSIBLE_SCORE, ModelRiskScore, is_at_risk
 
 AT_RISK_TAG_URN = "urn:li:tag:undertow:at-risk"
 RISK_SCORE_PROPERTY_URN = "urn:li:structuredProperty:deadreckon.riskScore"
@@ -89,7 +89,10 @@ def ensure_writeback_definitions(graph: DataHubGraph) -> None:
         aspect=StructuredPropertyDefinitionClass(
             qualifiedName="deadreckon.riskScore",
             displayName="Undertow Risk Score",
-            description="detector weight x blast radius, from the most recent deadreckon run.",
+            description=(
+                f"detector weight x blast radius, from the most recent deadreckon run. "
+                f"Range: 0 to {MAX_POSSIBLE_SCORE} (not a 0-1 normalized score)."
+            ),
             valueType="urn:li:dataType:datahub.number",
             entityTypes=["urn:li:entityType:datahub.mlModel"],
             cardinality=PropertyCardinalityClass.SINGLE,
@@ -189,7 +192,7 @@ def _render_report(model: ModelSnapshot, risk: ModelRiskScore, now: datetime) ->
         f"# Model Risk Assessment - {model.name}",
         "",
         f"Assessed: {now.isoformat()}",
-        f"Risk score: {risk.score} ({risk.severity})",
+        f"Risk score: {risk.score}/{MAX_POSSIBLE_SCORE} ({risk.severity})",
         f"Blast radius: {risk.blast_radius} (deployment environments: {', '.join(model.deployment_environments) or 'none'})",
         "",
         "## Findings",
@@ -256,8 +259,8 @@ def write_risk_assessment(graph: DataHubGraph, model: ModelSnapshot, risk: Model
     # reasoning - front-loaded so severity/score/detector/subject survive
     # the UI's own truncation regardless of where it cuts.
     memory_description = (
-        f"{DEADRECKON_MEMORY_MARKER} {risk.severity} risk={risk.score} | {risk.findings[0].detector}: "
-        f"{_finding_subject(risk.findings[0])}"
+        f"{DEADRECKON_MEMORY_MARKER} {risk.severity} risk={risk.score}/{MAX_POSSIBLE_SCORE} | "
+        f"{risk.findings[0].detector}: {_finding_subject(risk.findings[0])}"
         + (f" (+{len(risk.findings) - 1} more finding(s))" if len(risk.findings) > 1 else "")
     )
     at_risk_list_url = f"{FRONTEND_BASE_URL}/search?query=undertow%3Aat-risk"

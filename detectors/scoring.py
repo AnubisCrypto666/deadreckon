@@ -37,6 +37,16 @@ SEVERITY_THRESHOLDS = (
     ("MEDIUM", 0.8),
 )
 
+# score is weight x blast_radius, not a 0-1 normalized value - a bare
+# "risk=1.0" reads like a maxed-out scale by coincidence (D2's weight of
+# 1.0 x a single-STAGING blast radius of 1.0 = 1.0), when the real ceiling
+# is higher. Computed from the constants above, not hardcoded, so it can't
+# go stale if the weights change - the true max is the strongest detector
+# weight times a model flagged in every known environment at once (MULTIPLE
+# cardinality allows a model to carry more than one deployment_environment
+# value), not just the biggest score seen in any particular dataset.
+MAX_POSSIBLE_SCORE = round(max(DETECTOR_WEIGHTS.values()) * sum(ENVIRONMENT_WEIGHTS.values()), 2)
+
 # Which severities are worth the `undertow:at-risk` tag - i.e. worth a
 # visual flag an owner has to act on, not just a recorded score. LOW is
 # everything below the MEDIUM threshold (0.8): either an undeployed model
