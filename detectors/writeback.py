@@ -20,20 +20,25 @@ they concern (plan-pracy-undertow.md Sec.5):
    merely has a finding. Removing it when a model drops below threshold
    (e.g. its findings clear on a later run) keeps the tag meaning
    "currently at risk", not "was ever flagged".
-4. An `institutionalMemory` entry (the aspect behind the classic
-   "Documentation"/"Links" tab) with a one-line risk summary. This exists
-   because `relatedAssets`/`relatedDocuments` (used for (1)) is a
-   different, newer relationship than `institutionalMemory` - a document
-   attached only via `relatedAssets` does not show up on the model's
-   Documentation tab in this DataHub version (verified: `MLModel`'s
-   GraphQL type has both `institutionalMemory` and `relatedDocuments` as
-   separate fields). Confirmed empirically that the standalone Document
-   entity has *no* working profile route in this DataHub version at all -
-   neither a direct URL guess nor the UI's own "Resources" card for it
-   resolves to anything (both 404) - so this entry's `description` (not
-   its `url`, which points at the at-risk search list instead) is what
-   actually carries the reasoning, front-loaded so severity/score/
-   detector/subject survive the UI's own text truncation. See NOTES.md.
+4. One `institutionalMemory` entry per finding (the aspect behind the
+   classic "Documentation"/"Links" tab), capped at
+   `MAX_INSTITUTIONAL_MEMORY_FINDING_ROWS` with a "(+N more)" summary row
+   beyond that, plus one overview row - this exists because
+   `relatedAssets`/`relatedDocuments` (used for (1)) is a different,
+   newer relationship than `institutionalMemory`: a document attached
+   only via `relatedAssets` does not show up on the model's Documentation
+   tab in this DataHub version (verified: `MLModel`'s GraphQL type has
+   both `institutionalMemory` and `relatedDocuments` as separate fields).
+   Confirmed empirically that the standalone Document entity has *no*
+   working profile route in this DataHub version at all - neither a
+   direct URL guess nor the UI's own "Resources" card for it resolves to
+   anything (both 404) - so these entries' `description`s (not their
+   shared `url`, which points at the at-risk search list instead) are
+   what actually carry the reasoning, one finding per row rather than one
+   entry with a "(+N more)" tail hiding everything past the first
+   finding. Every run replaces the *entire* set of `[deadreckon]`-marked
+   elements rather than updating them in place, so a model going from N
+   findings to M findings never leaves stale rows behind - see NOTES.md.
 
 GlobalTags and StructuredProperties emissions are full-aspect replacements,
 not merges (the same gotcha documented for the upstream nyc-taxi fixture in
@@ -151,22 +156,46 @@ def _set_structured_properties(graph: DataHubGraph, entity_urn: str, updates: di
 DEADRECKON_MEMORY_MARKER = "[deadreckon]"
 
 
-def _set_institutional_memory_link(graph: DataHubGraph, entity_urn: str, url: str, description: str, now: datetime) -> None:
-    # Dedupe/replace by our own marker prefix, not by url - the url this
-    # points at has changed once already (see NOTES.md: the standalone
-    # Document entity has no working profile route in this DataHub
-    # version, confirmed 404 both directly and via the Resources card, so
-    # this now links to the at-risk search list instead). Keying on url
-    # would leave the old, dead link behind as a stale duplicate entry.
+def _set_institutional_memory_entries(graph: DataHubGraph, entity_urn: str, url: str, descriptions: list[str], now: datetime) -> None:
+    # Dedupe/replace by our own marker prefix, not by url or by matching
+    # up old/new element pairs - every run drops *all* previously-written
+    # [deadreckon] elements and writes the current full set fresh. This is
+    # what makes it correct when the finding count changes between runs
+    # (3 findings -> 1 -> 3 again): there's no stale leftover to clean up
+    # because nothing is preserved across runs in the first place, unlike
+    # a scheme that tried to update elements in place by index/URL, which
+    # would leave old rows behind once the count shrinks.
     existing = graph.get_aspect(entity_urn=entity_urn, aspect_type=InstitutionalMemoryClass)
     elements = [e for e in (existing.elements if existing else []) if not e.description.startswith(DEADRECKON_MEMORY_MARKER)]
     now_millis = int(now.timestamp() * 1000)
-    elements.append(InstitutionalMemoryMetadataClass(
-        url=url,
-        description=description,
-        createStamp=AuditStampClass(time=now_millis, actor=WRITEBACK_ACTOR_URN),
-    ))
+    for description in descriptions:
+        elements.append(InstitutionalMemoryMetadataClass(
+            url=url,
+            description=description,
+            createStamp=AuditStampClass(time=now_millis, actor=WRITEBACK_ACTOR_URN),
+        ))
     graph.emit(MetadataChangeProposalWrapper(entityUrn=entity_urn, aspect=InstitutionalMemoryClass(elements=elements)))
+
+
+MAX_INSTITUTIONAL_MEMORY_FINDING_ROWS = 5
+
+
+def _build_finding_memory_descriptions(risk: ModelRiskScore) -> list[str]:
+    """One compact row per finding (up to a ceiling), plus an overview
+    row - instead of one entry with a "(+N more)" tail that hid anything
+    past the first finding entirely (the document it would have pointed
+    to has no working UI route at all - see NOTES.md)."""
+    overview = (
+        f"{DEADRECKON_MEMORY_MARKER} {risk.severity} risk={risk.score}/{MAX_POSSIBLE_SCORE} - "
+        f"{len(risk.findings)} finding(s) below"
+    )
+    shown = risk.findings[:MAX_INSTITUTIONAL_MEMORY_FINDING_ROWS]
+    rows = [overview]
+    rows += [f"{DEADRECKON_MEMORY_MARKER} - {f.detector}: {_finding_subject(f)}" for f in shown]
+    remaining = len(risk.findings) - len(shown)
+    if remaining > 0:
+        rows.append(f"{DEADRECKON_MEMORY_MARKER} - (+{remaining} more finding(s), see the document/API for detail)")
+    return rows
 
 
 def _short_dataset_name(dataset_urn: str) -> str:
@@ -257,13 +286,11 @@ def write_risk_assessment(graph: DataHubGraph, model: ModelSnapshot, risk: Model
     # points at the at-risk search list instead of the document, and the
     # description (not the link) is what actually has to carry the
     # reasoning - front-loaded so severity/score/detector/subject survive
-    # the UI's own truncation regardless of where it cuts.
-    memory_description = (
-        f"{DEADRECKON_MEMORY_MARKER} {risk.severity} risk={risk.score}/{MAX_POSSIBLE_SCORE} | "
-        f"{risk.findings[0].detector}: {_finding_subject(risk.findings[0])}"
-        + (f" (+{len(risk.findings) - 1} more finding(s))" if len(risk.findings) > 1 else "")
-    )
+    # the UI's own truncation regardless of where it cuts. One row per
+    # finding (capped, see MAX_INSTITUTIONAL_MEMORY_FINDING_ROWS) instead
+    # of a single entry with a "(+N more)" tail that hid everything past
+    # the first finding.
     at_risk_list_url = f"{FRONTEND_BASE_URL}/search?query=undertow%3Aat-risk"
-    _set_institutional_memory_link(graph, model.urn, at_risk_list_url, memory_description, now)
+    _set_institutional_memory_entries(graph, model.urn, at_risk_list_url, _build_finding_memory_descriptions(risk), now)
 
     return document_urn
