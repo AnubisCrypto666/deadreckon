@@ -596,6 +596,142 @@ material for OSS doc-fix contributions.
   `institutionalMemory`/tags/properties on the entities they're attached
   to if a human needs to see them in the UI.
 
+## Sesja 28.07 - decyzje
+
+Skrót do wznowienia pracy po `/clear`. Szczegóły w commitach `1cab4d7`,
+`4f44376`, `80233f2`, `8aa2c8a`, `85e5208`.
+
+### 1. Audyt scoringu (A1-A3) + próg MEDIUM 0.7
+
+Przestrzeń score jest **dyskretna** - waga detektora x blast radius daje
+9 osiągalnych wartości, nie kontinuum. Dlatego "procent maksimum" to zły
+model myślowy; progi rozdzielają klastry, nie procenty.
+
+- **A3: `blast_radius` sumował środowiska -> teraz bierze maksimum.**
+  Model już w PROD nie staje się groźniejszy przez to, że stoi też w
+  STAGING - ekspozycja produkcyjna pochłania wszystko. Sumowanie miałoby
+  sens dla *instancji* (PROD-EU + PROD-US), ale nasz słownik to
+  *szczeble*, a szczeble się maksymalizuje. Efekt uboczny: sufit spadł z
+  nieosiągalnego 4.0 na realne **3.0**, które w demie jest zajęte.
+- **A1: dominacja środowiska jest zamierzona i poprawna.** Model
+  produkcyjny z najsłabszym detektorem bije martwy model w STAGING z
+  najmocniejszym, bo pierwszy kosztuje pieniądze dziś, a drugi nic aż do
+  promocji. Niezmiennik "środowisko wybiera pasmo, detektor porządkuje
+  wewnątrz pasma" jest teraz **pilnowany testem** po wszystkich
+  kombinacjach detektorów, a nie trzyma się przypadkiem.
+- **A1: `UNDEPLOYED_BLAST_RADIUS` -> `LATENT_RISK_FLOOR`.** Model bez
+  wdrożeń ma promień rażenia **zero**; 0.5 to podłoga utrzymująca ryzyko
+  utajone w rankingu, nie pomiar "pół STAGING-a".
+- **A2: score bierze maksimum, krotność łamie remisy w sortowaniu.**
+  Wariant z premią za wielość znalezisk *wewnątrz* score przeliczyłem -
+  podnosi sufit do 3.6-4.3 i odtwarza dokładnie problem nieosiągalnego
+  maksimum, który właśnie naprawiliśmy. Dlatego krotność siedzi w
+  `ModelRiskScore.sort_key` i w `deadreckon.findingCount`.
+- **Próg MEDIUM 0.8 -> 0.7.** 0.8 stało *dokładnie na osiągalnej
+  wartości* (D1 x STAGING). Zmiana wagi D1 na 0.79 po cichu przerzuciłaby
+  całą klasę modeli z MEDIUM do LOW. Klasyfikacja identyczna dla każdej
+  osiągalnej wartości, tylko bez kruchości. HIGH=2.0 było już w luce.
+
+### 2. Model trójstanowy - dlaczego INSUFFICIENT_DATA jest poza riskScore
+
+`PASS` i `INSUFFICIENT_DATA` to **różne twierdzenia**: "sprawdziłem, jest
+dobrze" vs "nie miałem czym sprawdzić". Wcześniej D1 zwracał to samo
+(brak znalezisk) i przy świeżym datasecie, i przy braku aspektu
+`operation` - czyli raportował niezmierzony model jako czysty. To jest
+dokładnie ta cicha awaria, którą projekt ma wykrywać, popełniana przez
+sam projekt.
+
+Ryzyko i niewiedza **nie mogą wpaść do jednego skalara**, bo oba tracą
+znaczenie. Dlatego pokrycie jest osobnym sygnałem
+(`deadreckon.assessmentCoverage`, np. "2/3") plus tag
+`undertow:unassessable`, gdy żaden detektor nie wydał werdyktu. Model
+nieoceniony ma score 0.0 tak samo jak czysty - **pokrycie jest jedyną
+rzeczą, która je odróżnia**, i dashboard ma obowiązek to pokazać.
+
+Zasada agregacji: znalezisko zawsze wygrywa jako nagłówek; w razie jego
+braku *jakikolwiek* niesprawdzony podmiot degraduje detektor do
+INSUFFICIENT_DATA, bo "czysto" wymaga, żeby naprawdę wszystko obejrzeć.
+
+Efekt na żywych danych: żadna tabela Snowflake z `showcase-ecommerce` nie
+ma aspektu `operation`, więc D1 nie jest w stanie ocenić trzech z pięciu
+modeli. **Ten brak pochodzi z oryginalnego datapacka, nie od nas** -
+zweryfikowane dwustronnie: emitujemy `OperationClass` wyłącznie dla
+`sqlite`/nyc_taxi i nigdy nic nie usuwamy, a w grafie 6 z 77 datasetów ma
+ten aspekt i wszystkie są nasze.
+
+### 3. Determinizm czasu - aspekty timeseries dopisują, nie zastępują
+
+**Sedno:** `DataProcessInstanceRunEvent` i `operation` to aspekty
+*timeseries*. Ponowny zasiew **dokłada** zdarzenia zamiast je nadpisać,
+więc wynik zależał od **historii zasiewów**, nie od bieżącego stanu.
+Objaw: po teście z przesuniętym zegarem model wrócił z datą treningu
+**w przyszłości**, co przewróciło werdykty D2/D3.
+
+Naprawa dwutorowa:
+- Czas przebiegu treningowego czytamy z
+  `DataProcessInstanceProperties.created` - aspekt **wersjonowany**,
+  który reseed faktycznie nadpisuje.
+- Świeżość datasetu: ocena "na moment T" **ignoruje zdarzenia
+  zaraportowane po T**. To poprawne semantyki point-in-time i przy okazji
+  uodparnia na zanieczyszczony graf.
+
+**Dowód:** `detectors/clock.py` daje wspólne "teraz" dla seedów i
+detektorów (`DEADRECKON_NOW` / `--as-of`) *wyłącznie po to, żeby teza
+była testowalna*. Procedura: zasiej + oceń, przesuń zegar o 10 dni,
+zasiej ponownie + oceń, `diff` macierzy 5x3. Przeprowadzony dwukrotnie
+(raz po zmianie lineage'u) - pusty.
+
+**Uwaga na przyszłość:** mój *pierwszy* dowód przeszedł przypadkiem, bo
+akumulacja zdarzeń była monotoniczna. Zielony wynik testu determinizmu
+nie znaczy nic, jeśli nie sprawdzi się też stanu grafu.
+
+`run_detectors.py` ostrzega, gdy najświeższy dataset przekroczył próg D1
+- dryf seeda ma być głośny, nie cichy. Przed nagraniem: **przesiać**.
+
+Przy okazji: `seed/nyc_taxi_freshness.py` emitował przez
+nieuwierzytelniony `DatahubRestEmitter` (401) - teraz `get_default_graph()`
+jak reszta.
+
+### 4. Kontrakt JSON v1.0.0 - co przyjęliśmy i odrzuciliśmy z recenzji Kimi
+
+Recenzję zrobiła Kimi CLI - **inna linia modelu i faktyczny odbiorca**
+(to ona buduje dashboard), więc to recenzja konsumenta, nie drugie
+spojrzenie tego samego modelu. Werdykt: nic nie blokowało zbudowania UI,
+ale kilka kształtów wypychało pracę do frontendu.
+
+**Przyjęte:** grupowanie luk po aspekcie + `missing` -> `aspect` (nazwa
+była przeciążona, a *nasz własny* zapis do grafu już grupował - dwie
+powierzchnie tej samej informacji muszą mieć ten sam kształt); findings
+pod `detectors.{D}.findings` (join znika z UI); `group.url`;
+`detectors_meta`; `lineage_path` per znalezisko; `evidence`
+udokumentowane jako **różne per detektor** zamiast udawania worka
+(normalizacja odłożona świadomie jako refactor).
+
+**Odrzucone, z powodami:**
+
+- **`tags` zostają.** Kimi wyprowadziła `at_risk` jako "ma znaleziska" -
+  **to błąd rzeczowy**. `at_risk` jest bramkowane **severity**, nie
+  liczbą znalezisk: model niewdrożony z D2 ma score 0.5 -> LOW ->
+  `at_risk: false` przy `finding_count: 1`. Frontend na tej regule
+  narysowałby czerwoną flagę tam, gdzie graf jej nie ma, i **rozjechałby
+  się z DataHubem**. Ale wina była po naszej stronie: w dumpie nie było
+  ani jednego takiego modelu (ani żadnego `unassessable`), więc recenzent
+  nie miał jak tego zobaczyć. Stąd `examples/sample-run-edge-cases.json` -
+  syntetyczny, ale przez **ten sam serializer**, trzymany osobno, żeby
+  macierz demo została nietknięta.
+- **Cechy i przebiegi treningowe NIE dostają URL-i.** Zweryfikowałem
+  empirycznie tylko trasy `/dataset/` i `/mlModels/`. Trasy dla
+  `mlFeature` i `dataProcessInstance` są niesprawdzone, a precedens jest
+  świeży: encja `document` nie ma **żadnej** działającej trasy, przez co
+  wygenerowaliśmy linki dające 404 i trzeba je było wycofać. **Sam URN
+  jest lepszy niż link w 404** - sędzia w niego kliknie.
+- `assessment_document_urn` zostaje (dowód, że writeback się wykonał -
+  a to jest wprost punktowane), `blast_radius_stage` odpuszczony
+  (`serving_stages` już niesie nazwy), żadnych cięć pól wyprowadzalnych
+  (rozmiar payloadu nie jest naszym problemem).
+
+Sesja recenzji: `kimi -r session_74d50759-f59a-4fa0-a02f-974bfe18b96d`.
+
 ## Audyt sesji 2026-07-26
 
 Poniżej pełny, dosłowny przegląd tej sesji Claude Code, dla drugiego
