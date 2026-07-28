@@ -10,11 +10,11 @@ Usage:
 """
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime
 
 from datahub.ingestion.graph.client import get_default_graph
 
-from detectors import d1_frozen_source, d2_schema_drift, d3_semantic_drift
+from detectors import clock, d1_frozen_source, d2_schema_drift, d3_semantic_drift
 from detectors.fetch import fetch_all_model_snapshots, fetch_dataset_snapshots
 from detectors.models import DetectorResult, DetectorStatus, ModelSnapshot
 from detectors.scoring import MAX_POSSIBLE_SCORE, ModelRiskScore, is_at_risk, score_model
@@ -42,6 +42,31 @@ def run_detectors(model: ModelSnapshot, datasets: dict, now: datetime) -> list[D
     ]
 
 
+# How far the freshest seeded dataset may lag "now" before the matrix
+# stops matching the one the seed was built to produce. D1's own
+# threshold is the real limit - past it, a dataset the seed made fresh
+# starts reading as stale purely because time passed since seeding.
+SEED_STALENESS_WARNING_DAYS = d1_frozen_source.DEFAULT_FRESHNESS_THRESHOLD_DAYS
+
+
+def warn_if_seed_is_stale(datasets: dict, now: datetime) -> None:
+    """Make seed drift loud rather than silent.
+
+    Freshness is wall-clock relative, so a graph seeded days ago yields a
+    different matrix than the same seed run today - which would mean a
+    judge sees something other than the demo. Rather than let that pass
+    quietly, say so and name the fix.
+    """
+    timestamps = [ds.last_updated for ds in datasets.values() if ds.last_updated is not None]
+    if not timestamps:
+        return
+    age_days = (now - max(timestamps)).days
+    if age_days >= SEED_STALENESS_WARNING_DAYS:
+        print(f"  WARNING: freshest dataset in the graph is {age_days}d old. The seed anchors "
+              f"timestamps to when it runs, so results will differ from a freshly seeded graph.")
+        print("           Re-run seed/ (see README) for the reproducible matrix.")
+
+
 def print_matrix(rows: list[tuple[ModelSnapshot, list[DetectorResult], ModelRiskScore]]) -> None:
     name_width = max(len(m.name) for m, _, _ in rows)
     header = (f"{'model'.ljust(name_width)}  " + "  ".join(d.ljust(7) for d in DETECTOR_ORDER)
@@ -59,9 +84,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="skip writeback, print findings only")
     parser.add_argument("--matrix", action="store_true", help="print the model x detector state matrix")
+    parser.add_argument("--as-of", type=str, default=None,
+                         help="ISO timestamp to assess against (default: DEADRECKON_NOW, else real now)")
     args = parser.parse_args()
 
-    now = datetime.now(timezone.utc)
+    now = clock.now(args.as_of)
     graph = get_default_graph()
 
     print("Fetching model lineage from DataHub...")
@@ -69,12 +96,15 @@ def main() -> None:
     print(f"  {len(models)} model(s) found")
 
     dataset_urns = collect_dataset_urns(models)
-    datasets = fetch_dataset_snapshots(graph, dataset_urns)
+    datasets = fetch_dataset_snapshots(graph, dataset_urns, now)
     # D3 needs snapshots for upstream transformation datasets too, which
     # aren't feature sources or training inputs themselves.
     transform_urns = {u for ds in datasets.values() for u in ds.upstream_transformation_urns}
-    datasets.update(fetch_dataset_snapshots(graph, transform_urns - datasets.keys()))
+    datasets.update(fetch_dataset_snapshots(graph, transform_urns - datasets.keys(), now))
     print(f"  {len(datasets)} dataset(s) fetched for detector input")
+    warn_if_seed_is_stale(datasets, now)
+    if clock.is_overridden():
+        print(f"  (clock overridden via {clock.NOW_ENV_VAR}: assessing as of {now.isoformat()})")
 
     if not args.dry_run:
         ensure_writeback_definitions(graph)

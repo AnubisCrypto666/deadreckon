@@ -24,14 +24,19 @@ the upstream fixture have already loaded the tables into DataHub.
 
 import argparse
 import sqlite3
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
-from datahub.emitter.rest_emitter import DatahubRestEmitter
+from datahub.ingestion.graph.client import get_default_graph
 from datahub.metadata.schema_classes import OperationClass, OperationTypeClass
 
-DATAHUB_SERVER = "http://localhost:8080"
+# See seed/ml_lineage.py for why the repo root is bootstrapped onto sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from detectors import clock  # noqa: E402
+
 PLATFORM = "sqlite"
 
 # table -> (column to read MAX() from, is it a full datetime or a bare date)
@@ -63,8 +68,9 @@ def time_shift(real_timestamps: dict[str, datetime], anchor: datetime) -> dict[s
     return {table: ts + shift for table, ts in real_timestamps.items()}
 
 
-def emit_operations(emitter: DatahubRestEmitter, platform_instance: str, shifted: dict[str, datetime]) -> None:
-    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+def emit_operations(emitter, platform_instance: str, shifted: dict[str, datetime],
+                     anchor: datetime) -> None:
+    now_ms = int(anchor.timestamp() * 1000)
     for table, last_updated in shifted.items():
         urn = f"urn:li:dataset:(urn:li:dataPlatform:{PLATFORM},{platform_instance}.main.{table},PROD)"
         emitter.emit(
@@ -77,7 +83,7 @@ def emit_operations(emitter: DatahubRestEmitter, platform_instance: str, shifted
                 ),
             )
         )
-        age_days = (datetime.now(timezone.utc) - last_updated).days
+        age_days = (anchor - last_updated).days
         print(f"    {platform_instance}.{table}: lastUpdatedTimestamp={last_updated.isoformat()} ({age_days}d ago)")
 
 
@@ -87,15 +93,18 @@ def main() -> None:
     parser.add_argument("--anchor", type=str, default=None, help="ISO date to treat as 'now' (default: real now)")
     args = parser.parse_args()
 
-    anchor = datetime.now(timezone.utc) if args.anchor is None else datetime.fromisoformat(args.anchor).replace(tzinfo=timezone.utc)
-    emitter = DatahubRestEmitter(DATAHUB_SERVER)
+    anchor = clock.now(args.anchor)
+    # get_default_graph() reads ~/.datahubenv and authenticates the same
+    # way the `datahub` CLI does. A bare DatahubRestEmitter(url) has no
+    # credentials and gets a 401 from GMS, which is what this used to do.
+    emitter = get_default_graph()
 
     for db_name, instance in [("nyc_taxi.db", "nyc_taxi"), ("nyc_taxi_pipeline.db", "nyc_taxi_pipeline")]:
         db_path = args.fixtures_dir / db_name
         print(f"\n  Instance: {instance} ({db_path.name})")
         real = read_real_max_timestamps(db_path)
         shifted = time_shift(real, anchor)
-        emit_operations(emitter, instance, shifted)
+        emit_operations(emitter, instance, shifted, anchor)
 
     print("\nDone. nyc_taxi is a healthy baseline (all tables shift to 'now').")
     print("nyc_taxi_pipeline has raw_trips fresh and staging/mart frozen behind it — this is what D1 reads.")

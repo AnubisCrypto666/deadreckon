@@ -34,7 +34,9 @@ does without a token ever having to be typed into a script or shell here.
 """
 
 import argparse
+import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from datahub.emitter.mce_builder import (
     make_data_process_instance_urn,
@@ -66,6 +68,13 @@ from datahub.metadata.schema_classes import (
     StructuredPropertyValueAssignmentClass,
     SubTypesClass,
 )
+
+# Seeds are run directly (`python seed/ml_lineage.py`), so the repo root
+# isn't on sys.path by default - put it there rather than making the
+# judge install the project first just to run the setup steps.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from detectors import clock  # noqa: E402
 
 DEPLOYMENT_ENV_PROPERTY_URN = "urn:li:structuredProperty:deadreckon.deploymentEnvironment"
 
@@ -377,8 +386,7 @@ def main() -> None:
     parser.add_argument("--anchor", type=str, default=None,
                          help="ISO date to treat as 'now' for run timestamps (default: real now)")
     args = parser.parse_args()
-    now = (datetime.now(timezone.utc) if args.anchor is None
-           else datetime.fromisoformat(args.anchor).replace(tzinfo=timezone.utc))
+    now = clock.now(args.anchor)
 
     graph = get_default_graph()
 

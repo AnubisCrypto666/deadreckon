@@ -38,7 +38,9 @@ target state (rename + edited logic + same property values).
 
 import argparse
 import copy
+import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from datahub.emitter.mcp import MetadataChangeProposalWrapper
 from datahub.ingestion.graph.client import get_default_graph
@@ -50,6 +52,11 @@ from datahub.metadata.schema_classes import (
     StructuredPropertyValueAssignmentClass,
     ViewPropertiesClass,
 )
+
+# See seed/ml_lineage.py for why the repo root is bootstrapped onto sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from detectors import clock  # noqa: E402
 
 CUSTOMERS_URN = "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)"
 ORDER_DETAILS_DBT_URN = "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)"
@@ -182,8 +189,7 @@ def main() -> None:
     parser.add_argument("--anchor", type=str, default=None,
                          help="ISO date to treat as 'now' (default: real now) - keep in sync with ml_lineage.py's --anchor")
     args = parser.parse_args()
-    now = (datetime.now(timezone.utc) if args.anchor is None
-           else datetime.fromisoformat(args.anchor).replace(tzinfo=timezone.utc))
+    now = clock.now(args.anchor)
 
     graph = get_default_graph()
 

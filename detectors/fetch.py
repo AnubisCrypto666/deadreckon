@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from datahub.ingestion.graph.client import DataHubGraph
 from datahub.metadata.schema_classes import (
     DataProcessInstanceInputClass,
+    DataProcessInstancePropertiesClass,
     MLFeaturePropertiesClass,
     MLModelPropertiesClass,
     SchemaMetadataClass,
@@ -80,29 +81,37 @@ def _parse_iso(value: str | None) -> datetime | None:
 
 
 def fetch_training_run(graph: DataHubGraph, run_urn: str) -> TrainingRun | None:
+    """Read a training run's completion time from `DataProcessInstanceProperties.created`.
+
+    Deliberately *not* from the `DataProcessInstanceRunEvent` timeseries
+    aspect, even though that is semantically the "run finished" signal.
+    Timeseries aspects append rather than replace, so re-running the seed
+    leaves every previous run's events in place and `max(timestampMillis)`
+    returns whichever seeding happened to use the latest clock - making
+    the assessed training date depend on seeding *history* instead of the
+    current seed. That silently broke determinism once already (a model
+    came back with a training date in the future after a clock-shifted
+    test seed), which is exactly the class of drift this pipeline is
+    supposed to detect rather than exhibit.
+
+    `DataProcessInstanceProperties` is a versioned aspect: a re-seed
+    overwrites it, so the graph always reflects the most recent seed and
+    nothing else. seed/ml_lineage.py sets `created` to the run time.
+    """
     inputs = graph.get_aspect(entity_urn=run_urn, aspect_type=DataProcessInstanceInputClass)
     input_urns = tuple(inputs.inputs) if inputs else ()
 
-    query = """
-    query getRunState($urn: String!) {
-      entity(urn: $urn) {
-        ... on DataProcessInstance {
-          state(startTimeMillis: 0, endTimeMillis: 253402300799000, limit: 100) {
-            timestampMillis
-          }
-        }
-      }
-    }
-    """
-    result = graph.execute_graphql(query=query, variables={"urn": run_urn})
-    states = (result.get("entity") or {}).get("state") or []
-    if not states:
+    props = graph.get_aspect(entity_urn=run_urn, aspect_type=DataProcessInstancePropertiesClass)
+    if props is None or props.created is None:
         return None
-    completed_at = _millis_to_dt(max(s["timestampMillis"] for s in states))
-    return TrainingRun(urn=run_urn, completed_at=completed_at, input_dataset_urns=input_urns)
+    return TrainingRun(
+        urn=run_urn,
+        completed_at=_millis_to_dt(props.created.time),
+        input_dataset_urns=input_urns,
+    )
 
 
-def fetch_dataset_snapshot(graph: DataHubGraph, dataset_urn: str) -> DatasetSnapshot:
+def fetch_dataset_snapshot(graph: DataHubGraph, dataset_urn: str, now: datetime | None = None) -> DatasetSnapshot:
     schema = graph.get_aspect(entity_urn=dataset_urn, aspect_type=SchemaMetadataClass)
     current_columns = frozenset(f.fieldPath for f in schema.fields) if schema else frozenset()
 
@@ -110,11 +119,20 @@ def fetch_dataset_snapshot(graph: DataHubGraph, dataset_urn: str) -> DatasetSnap
     schema_changed_at = _parse_iso(_string_property(props, SCHEMA_CHANGED_AT_PROPERTY_URN))
     definition_changed_at = _parse_iso(_string_property(props, DEFINITION_CHANGED_AT_PROPERTY_URN))
 
+    # `operation` is a timeseries aspect: emissions append, they never
+    # replace. Re-seeding therefore leaves every previously emitted event
+    # in the graph, and asking for the single latest one returns whichever
+    # emission carried the highest timestamp - not the current seed's.
+    # Assessing "as of now" has to mean "using what was known by now", so
+    # events reported after the assessment instant are excluded; that is
+    # both the correct point-in-time semantics and what keeps a re-seed
+    # (or a clock-shifted test seed) from poisoning later runs.
     query = """
     query getOperations($urn: String!) {
       entity(urn: $urn) {
         ... on Dataset {
-          operations(limit: 1) {
+          operations(limit: 50) {
+            timestampMillis
             lastUpdatedTimestamp
           }
         }
@@ -123,7 +141,12 @@ def fetch_dataset_snapshot(graph: DataHubGraph, dataset_urn: str) -> DatasetSnap
     """
     result = graph.execute_graphql(query=query, variables={"urn": dataset_urn})
     operations = (result.get("entity") or {}).get("operations") or []
-    last_updated = _millis_to_dt(operations[0]["lastUpdatedTimestamp"]) if operations else None
+    cutoff_millis = int((now or datetime.now(timezone.utc)).timestamp() * 1000)
+    observed = [op for op in operations
+                if op.get("lastUpdatedTimestamp") is not None
+                and op.get("timestampMillis", 0) <= cutoff_millis]
+    latest = max(observed, key=lambda op: op["timestampMillis"]) if observed else None
+    last_updated = _millis_to_dt(latest["lastUpdatedTimestamp"]) if latest else None
 
     upstream_transform_urns: tuple[str, ...] = ()
     upstream_lineage = graph.get_aspect(entity_urn=dataset_urn, aspect_type=UpstreamLineageClass)
@@ -197,5 +220,6 @@ def fetch_all_model_snapshots(graph: DataHubGraph) -> list[ModelSnapshot]:
     return snapshots
 
 
-def fetch_dataset_snapshots(graph: DataHubGraph, dataset_urns: set[str]) -> dict[str, DatasetSnapshot]:
-    return {urn: fetch_dataset_snapshot(graph, urn) for urn in dataset_urns}
+def fetch_dataset_snapshots(graph: DataHubGraph, dataset_urns: set[str],
+                             now: datetime | None = None) -> dict[str, DatasetSnapshot]:
+    return {urn: fetch_dataset_snapshot(graph, urn, now) for urn in dataset_urns}
