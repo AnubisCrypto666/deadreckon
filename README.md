@@ -83,8 +83,11 @@ matrix comes out identical.
 ### Machine-readable output
 
 `python run_detectors.py --json examples/sample-run.json` writes the full
-run. Schema: [`docs/output-schema.md`](docs/output-schema.md) (draft v0,
-not yet frozen). Sample: [`examples/sample-run.json`](examples/sample-run.json).
+run. Schema: [`docs/output-schema.md`](docs/output-schema.md) — **v1.0.0,
+frozen**, after review by the dashboard's author.
+
+- [`examples/sample-run.json`](examples/sample-run.json) — real dump of the seeded fixture.
+- [`examples/sample-run-edge-cases.json`](examples/sample-run-edge-cases.json) — synthetic, covering states the fixture can't reach (a finding on a model that is *not* at risk, and a fully unassessable model).
 
 ## Demo honesty
 

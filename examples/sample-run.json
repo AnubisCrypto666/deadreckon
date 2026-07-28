@@ -1,7 +1,7 @@
 {
-  "schema_version": "0.1.0-draft",
+  "schema_version": "1.0.0",
   "run": {
-    "assessed_at": "2026-07-28T18:48:41.953563+00:00",
+    "assessed_at": "2026-07-28T19:23:08.029780+00:00",
     "clock_overridden": false,
     "datahub_base_url": "http://localhost:9002",
     "models_assessed": 5,
@@ -11,6 +11,23 @@
       "D2",
       "D3"
     ]
+  },
+  "detectors_meta": {
+    "D1": {
+      "title": "Frozen training source",
+      "description": "An upstream dataset stopped receiving real updates, but training runs that consume it keep firing on schedule.",
+      "weight": 0.8
+    },
+    "D2": {
+      "title": "Schema drift under a feature",
+      "description": "A feature's source column is gone from the current schema, and it disappeared after the model's last training run - so serving reads nulls.",
+      "weight": 1.0
+    },
+    "D3": {
+      "title": "Semantic change without retrain",
+      "description": "An upstream dbt/Spark transformation changed its logic after the model's last training run - same schema, different meaning.",
+      "weight": 0.6
+    }
   },
   "scoring": {
     "max_possible_score": 3.0,
@@ -41,7 +58,8 @@
       "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Ccustomer_churn_predictor_v2%2CPROD%29",
       "group": {
         "urn": "urn:li:mlModelGroup:(urn:li:dataPlatform:mlflow,customer_churn_models,PROD)",
-        "name": "customer_churn_models"
+        "name": "customer_churn_models",
+        "url": null
       },
       "serving_stages": [
         "PROD"
@@ -63,24 +81,28 @@
           "conclusive": false,
           "subjects_checked": 0,
           "finding_count": 0,
-          "missing": [
+          "findings": [],
+          "coverage_gaps": [
             {
-              "missing": "operation.lastUpdatedTimestamp",
-              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
-              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.analytics.order_details%2CPROD%29",
-              "detail": "b2fd91.order_entry_db.analytics.order_details has no operation aspect, so its real update time is unknown"
-            },
-            {
-              "missing": "operation.lastUpdatedTimestamp",
-              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
-              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.customers%2CPROD%29",
-              "detail": "b2fd91.order_entry_db.order_entry.customers has no operation aspect, so its real update time is unknown"
-            },
-            {
-              "missing": "operation.lastUpdatedTimestamp",
-              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.orders,PROD)",
-              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.orders%2CPROD%29",
-              "detail": "b2fd91.order_entry_db.order_entry.orders has no operation aspect, so its real update time is unknown"
+              "aspect": "operation.lastUpdatedTimestamp",
+              "count": 3,
+              "subjects": [
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.analytics.order_details%2CPROD%29",
+                  "detail": "b2fd91.order_entry_db.analytics.order_details has no operation aspect, so its real update time is unknown"
+                },
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.customers%2CPROD%29",
+                  "detail": "b2fd91.order_entry_db.order_entry.customers has no operation aspect, so its real update time is unknown"
+                },
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.orders,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.orders%2CPROD%29",
+                  "detail": "b2fd91.order_entry_db.order_entry.orders has no operation aspect, so its real update time is unknown"
+                }
+              ]
             }
           ]
         },
@@ -89,34 +111,65 @@
           "conclusive": true,
           "subjects_checked": 5,
           "finding_count": 1,
-          "missing": []
+          "findings": [
+            {
+              "detector": "D2",
+              "summary": "customer_churn_predictor_v2's feature customer_credit_limit points at b2fd91.order_entry_db.order_entry.customers.credit_limit, missing for 3 day(s); last trained 2026-07-23, before the schema changed.",
+              "subject": "b2fd91.order_entry_db.order_entry.customers.credit_limit missing 3d",
+              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
+              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.customers%2CPROD%29",
+              "evidence": {
+                "feature_urn": "urn:li:mlFeature:(customer_features,customer_credit_limit)",
+                "dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
+                "source_column": "credit_limit",
+                "schema_changed_at": "2026-07-25T19:23:04.708712+00:00",
+                "missing_days": 3,
+                "latest_training_run_urn": "urn:li:dataProcessInstance:customer_churn_predictor_v2-run-0",
+                "latest_training_run_at": "2026-07-23T19:23:02.720000+00:00"
+              },
+              "lineage_path": [
+                {
+                  "type": "dataset",
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
+                  "name": "b2fd91.order_entry_db.order_entry.customers",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.customers%2CPROD%29",
+                  "ignition": true
+                },
+                {
+                  "type": "mlFeature",
+                  "urn": "urn:li:mlFeature:(customer_features,customer_credit_limit)",
+                  "name": "customer_credit_limit",
+                  "url": null,
+                  "ignition": false
+                },
+                {
+                  "type": "dataProcessInstance",
+                  "urn": "urn:li:dataProcessInstance:customer_churn_predictor_v2-run-0",
+                  "name": "customer_churn_predictor_v2-run-0",
+                  "url": null,
+                  "ignition": false
+                },
+                {
+                  "type": "mlModel",
+                  "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,customer_churn_predictor_v2,PROD)",
+                  "name": "customer_churn_predictor_v2",
+                  "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Ccustomer_churn_predictor_v2%2CPROD%29",
+                  "ignition": false
+                }
+              ]
+            }
+          ],
+          "coverage_gaps": []
         },
         "D3": {
           "status": "PASS",
           "conclusive": true,
           "subjects_checked": 5,
           "finding_count": 0,
-          "missing": []
+          "findings": [],
+          "coverage_gaps": []
         }
       },
-      "findings": [
-        {
-          "detector": "D2",
-          "summary": "customer_churn_predictor_v2's feature customer_credit_limit points at b2fd91.order_entry_db.order_entry.customers.credit_limit, missing for 3 day(s); last trained 2026-07-23, before the schema changed.",
-          "subject": "b2fd91.order_entry_db.order_entry.customers.credit_limit missing 3d",
-          "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
-          "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.customers%2CPROD%29",
-          "evidence": {
-            "feature_urn": "urn:li:mlFeature:(customer_features,customer_credit_limit)",
-            "dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
-            "source_column": "credit_limit",
-            "schema_changed_at": "2026-07-25T18:23:15.006195+00:00",
-            "missing_days": 3,
-            "latest_training_run_urn": "urn:li:dataProcessInstance:customer_churn_predictor_v2-run-0",
-            "latest_training_run_at": "2026-07-23T18:23:13.110000+00:00"
-          }
-        }
-      ],
       "tags": {
         "at_risk": true,
         "unassessable": false
@@ -129,7 +182,8 @@
       "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Ctaxi_eta_predictor_v1%2CPROD%29",
       "group": {
         "urn": "urn:li:mlModelGroup:(urn:li:dataPlatform:mlflow,taxi_eta_models,PROD)",
-        "name": "taxi_eta_models"
+        "name": "taxi_eta_models",
+        "url": null
       },
       "serving_stages": [
         "PROD"
@@ -151,39 +205,64 @@
           "conclusive": true,
           "subjects_checked": 2,
           "finding_count": 1,
-          "missing": []
+          "findings": [
+            {
+              "detector": "D1",
+              "summary": "taxi_eta_predictor_v1 trains on nyc_taxi_pipeline.main.staging_trips, frozen for 9 day(s), while training runs continue on schedule (latest: 2026-07-28).",
+              "subject": "nyc_taxi_pipeline.main.staging_trips frozen 9d",
+              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:sqlite,nyc_taxi_pipeline.main.staging_trips,PROD)",
+              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asqlite%2Cnyc_taxi_pipeline.main.staging_trips%2CPROD%29",
+              "evidence": {
+                "dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:sqlite,nyc_taxi_pipeline.main.staging_trips,PROD)",
+                "dataset_last_updated": "2026-07-19T08:34:09.190000+00:00",
+                "frozen_days": 9,
+                "latest_training_run_urn": "urn:li:dataProcessInstance:taxi_eta_predictor_v1-run-0",
+                "latest_training_run_at": "2026-07-28T19:23:02.720000+00:00"
+              },
+              "lineage_path": [
+                {
+                  "type": "dataset",
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:sqlite,nyc_taxi_pipeline.main.staging_trips,PROD)",
+                  "name": "nyc_taxi_pipeline.main.staging_trips",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asqlite%2Cnyc_taxi_pipeline.main.staging_trips%2CPROD%29",
+                  "ignition": true
+                },
+                {
+                  "type": "dataProcessInstance",
+                  "urn": "urn:li:dataProcessInstance:taxi_eta_predictor_v1-run-0",
+                  "name": "taxi_eta_predictor_v1-run-0",
+                  "url": null,
+                  "ignition": false
+                },
+                {
+                  "type": "mlModel",
+                  "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,taxi_eta_predictor_v1,PROD)",
+                  "name": "taxi_eta_predictor_v1",
+                  "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Ctaxi_eta_predictor_v1%2CPROD%29",
+                  "ignition": false
+                }
+              ]
+            }
+          ],
+          "coverage_gaps": []
         },
         "D2": {
           "status": "PASS",
           "conclusive": true,
           "subjects_checked": 3,
           "finding_count": 0,
-          "missing": []
+          "findings": [],
+          "coverage_gaps": []
         },
         "D3": {
           "status": "PASS",
           "conclusive": true,
           "subjects_checked": 3,
           "finding_count": 0,
-          "missing": []
+          "findings": [],
+          "coverage_gaps": []
         }
       },
-      "findings": [
-        {
-          "detector": "D1",
-          "summary": "taxi_eta_predictor_v1 trains on nyc_taxi_pipeline.main.staging_trips, frozen for 9 day(s), while training runs continue on schedule (latest: 2026-07-28).",
-          "subject": "nyc_taxi_pipeline.main.staging_trips frozen 9d",
-          "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:sqlite,nyc_taxi_pipeline.main.staging_trips,PROD)",
-          "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asqlite%2Cnyc_taxi_pipeline.main.staging_trips%2CPROD%29",
-          "evidence": {
-            "dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:sqlite,nyc_taxi_pipeline.main.staging_trips,PROD)",
-            "dataset_last_updated": "2026-07-19T07:34:19.502000+00:00",
-            "frozen_days": 9,
-            "latest_training_run_urn": "urn:li:dataProcessInstance:taxi_eta_predictor_v1-run-0",
-            "latest_training_run_at": "2026-07-28T18:23:13.110000+00:00"
-          }
-        }
-      ],
       "tags": {
         "at_risk": true,
         "unassessable": false
@@ -196,7 +275,8 @@
       "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Corder_value_predictor_v1%2CPROD%29",
       "group": {
         "urn": "urn:li:mlModelGroup:(urn:li:dataPlatform:mlflow,order_value_models,PROD)",
-        "name": "order_value_models"
+        "name": "order_value_models",
+        "url": null
       },
       "serving_stages": [
         "PROD"
@@ -218,24 +298,28 @@
           "conclusive": false,
           "subjects_checked": 0,
           "finding_count": 0,
-          "missing": [
+          "findings": [],
+          "coverage_gaps": [
             {
-              "missing": "operation.lastUpdatedTimestamp",
-              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
-              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.analytics.order_details%2CPROD%29",
-              "detail": "b2fd91.order_entry_db.analytics.order_details has no operation aspect, so its real update time is unknown"
-            },
-            {
-              "missing": "operation.lastUpdatedTimestamp",
-              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.order_items,PROD)",
-              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.order_items%2CPROD%29",
-              "detail": "b2fd91.order_entry_db.order_entry.order_items has no operation aspect, so its real update time is unknown"
-            },
-            {
-              "missing": "operation.lastUpdatedTimestamp",
-              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.orders,PROD)",
-              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.orders%2CPROD%29",
-              "detail": "b2fd91.order_entry_db.order_entry.orders has no operation aspect, so its real update time is unknown"
+              "aspect": "operation.lastUpdatedTimestamp",
+              "count": 3,
+              "subjects": [
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.analytics.order_details%2CPROD%29",
+                  "detail": "b2fd91.order_entry_db.analytics.order_details has no operation aspect, so its real update time is unknown"
+                },
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.order_items,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.order_items%2CPROD%29",
+                  "detail": "b2fd91.order_entry_db.order_entry.order_items has no operation aspect, so its real update time is unknown"
+                },
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.orders,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.orders%2CPROD%29",
+                  "detail": "b2fd91.order_entry_db.order_entry.orders has no operation aspect, so its real update time is unknown"
+                }
+              ]
             }
           ]
         },
@@ -244,33 +328,64 @@
           "conclusive": true,
           "subjects_checked": 4,
           "finding_count": 0,
-          "missing": []
+          "findings": [],
+          "coverage_gaps": []
         },
         "D3": {
           "status": "FINDING",
           "conclusive": true,
           "subjects_checked": 3,
           "finding_count": 1,
-          "missing": []
+          "findings": [
+            {
+              "detector": "D3",
+              "summary": "b2fd91.ORDER_ENTRY_DB.analytics.order_details's transformation logic changed 9 day(s) ago; order_value_predictor_v1 last trained 2026-07-17, still assumes the old definition.",
+              "subject": "b2fd91.ORDER_ENTRY_DB.analytics.order_details logic changed 9d ago",
+              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)",
+              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Adbt%2Cb2fd91.ORDER_ENTRY_DB.analytics.order_details%2CPROD%29",
+              "evidence": {
+                "transformation_dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)",
+                "feature_source_dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
+                "definition_changed_at": "2026-07-19T19:23:04.708712+00:00",
+                "changed_days": 9,
+                "latest_training_run_urn": "urn:li:dataProcessInstance:order_value_predictor_v1-run-0",
+                "latest_training_run_at": "2026-07-17T19:23:02.720000+00:00"
+              },
+              "lineage_path": [
+                {
+                  "type": "dataset",
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)",
+                  "name": "b2fd91.ORDER_ENTRY_DB.analytics.order_details",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Adbt%2Cb2fd91.ORDER_ENTRY_DB.analytics.order_details%2CPROD%29",
+                  "ignition": true
+                },
+                {
+                  "type": "dataset",
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
+                  "name": "b2fd91.order_entry_db.analytics.order_details",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.analytics.order_details%2CPROD%29",
+                  "ignition": false
+                },
+                {
+                  "type": "dataProcessInstance",
+                  "urn": "urn:li:dataProcessInstance:order_value_predictor_v1-run-0",
+                  "name": "order_value_predictor_v1-run-0",
+                  "url": null,
+                  "ignition": false
+                },
+                {
+                  "type": "mlModel",
+                  "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,order_value_predictor_v1,PROD)",
+                  "name": "order_value_predictor_v1",
+                  "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Corder_value_predictor_v1%2CPROD%29",
+                  "ignition": false
+                }
+              ]
+            }
+          ],
+          "coverage_gaps": []
         }
       },
-      "findings": [
-        {
-          "detector": "D3",
-          "summary": "b2fd91.ORDER_ENTRY_DB.analytics.order_details's transformation logic changed 9 day(s) ago; order_value_predictor_v1 last trained 2026-07-17, still assumes the old definition.",
-          "subject": "b2fd91.ORDER_ENTRY_DB.analytics.order_details logic changed 9d ago",
-          "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)",
-          "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Adbt%2Cb2fd91.ORDER_ENTRY_DB.analytics.order_details%2CPROD%29",
-          "evidence": {
-            "transformation_dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)",
-            "feature_source_dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
-            "definition_changed_at": "2026-07-19T18:23:15.006195+00:00",
-            "changed_days": 9,
-            "latest_training_run_urn": "urn:li:dataProcessInstance:order_value_predictor_v1-run-0",
-            "latest_training_run_at": "2026-07-17T18:23:13.110000+00:00"
-          }
-        }
-      ],
       "tags": {
         "at_risk": true,
         "unassessable": false
@@ -283,7 +398,8 @@
       "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Ccustomer_churn_predictor_v1%2CPROD%29",
       "group": {
         "urn": "urn:li:mlModelGroup:(urn:li:dataPlatform:mlflow,customer_churn_models,PROD)",
-        "name": "customer_churn_models"
+        "name": "customer_churn_models",
+        "url": null
       },
       "serving_stages": [
         "STAGING"
@@ -305,24 +421,28 @@
           "conclusive": false,
           "subjects_checked": 0,
           "finding_count": 0,
-          "missing": [
+          "findings": [],
+          "coverage_gaps": [
             {
-              "missing": "operation.lastUpdatedTimestamp",
-              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
-              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.analytics.order_details%2CPROD%29",
-              "detail": "b2fd91.order_entry_db.analytics.order_details has no operation aspect, so its real update time is unknown"
-            },
-            {
-              "missing": "operation.lastUpdatedTimestamp",
-              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
-              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.customers%2CPROD%29",
-              "detail": "b2fd91.order_entry_db.order_entry.customers has no operation aspect, so its real update time is unknown"
-            },
-            {
-              "missing": "operation.lastUpdatedTimestamp",
-              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.orders,PROD)",
-              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.orders%2CPROD%29",
-              "detail": "b2fd91.order_entry_db.order_entry.orders has no operation aspect, so its real update time is unknown"
+              "aspect": "operation.lastUpdatedTimestamp",
+              "count": 3,
+              "subjects": [
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.analytics.order_details%2CPROD%29",
+                  "detail": "b2fd91.order_entry_db.analytics.order_details has no operation aspect, so its real update time is unknown"
+                },
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.customers%2CPROD%29",
+                  "detail": "b2fd91.order_entry_db.order_entry.customers has no operation aspect, so its real update time is unknown"
+                },
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.orders,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.orders%2CPROD%29",
+                  "detail": "b2fd91.order_entry_db.order_entry.orders has no operation aspect, so its real update time is unknown"
+                }
+              ]
             }
           ]
         },
@@ -331,49 +451,111 @@
           "conclusive": true,
           "subjects_checked": 4,
           "finding_count": 1,
-          "missing": []
+          "findings": [
+            {
+              "detector": "D2",
+              "summary": "customer_churn_predictor_v1's feature customer_credit_limit points at b2fd91.order_entry_db.order_entry.customers.credit_limit, missing for 3 day(s); last trained 2026-06-12, before the schema changed.",
+              "subject": "b2fd91.order_entry_db.order_entry.customers.credit_limit missing 3d",
+              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
+              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.customers%2CPROD%29",
+              "evidence": {
+                "feature_urn": "urn:li:mlFeature:(customer_features,customer_credit_limit)",
+                "dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
+                "source_column": "credit_limit",
+                "schema_changed_at": "2026-07-25T19:23:04.708712+00:00",
+                "missing_days": 3,
+                "latest_training_run_urn": "urn:li:dataProcessInstance:customer_churn_predictor_v1-run-0",
+                "latest_training_run_at": "2026-06-12T19:23:02.720000+00:00"
+              },
+              "lineage_path": [
+                {
+                  "type": "dataset",
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
+                  "name": "b2fd91.order_entry_db.order_entry.customers",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.customers%2CPROD%29",
+                  "ignition": true
+                },
+                {
+                  "type": "mlFeature",
+                  "urn": "urn:li:mlFeature:(customer_features,customer_credit_limit)",
+                  "name": "customer_credit_limit",
+                  "url": null,
+                  "ignition": false
+                },
+                {
+                  "type": "dataProcessInstance",
+                  "urn": "urn:li:dataProcessInstance:customer_churn_predictor_v1-run-0",
+                  "name": "customer_churn_predictor_v1-run-0",
+                  "url": null,
+                  "ignition": false
+                },
+                {
+                  "type": "mlModel",
+                  "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,customer_churn_predictor_v1,PROD)",
+                  "name": "customer_churn_predictor_v1",
+                  "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Ccustomer_churn_predictor_v1%2CPROD%29",
+                  "ignition": false
+                }
+              ]
+            }
+          ],
+          "coverage_gaps": []
         },
         "D3": {
           "status": "FINDING",
           "conclusive": true,
           "subjects_checked": 4,
           "finding_count": 1,
-          "missing": []
+          "findings": [
+            {
+              "detector": "D3",
+              "summary": "b2fd91.ORDER_ENTRY_DB.analytics.order_details's transformation logic changed 9 day(s) ago; customer_churn_predictor_v1 last trained 2026-06-12, still assumes the old definition.",
+              "subject": "b2fd91.ORDER_ENTRY_DB.analytics.order_details logic changed 9d ago",
+              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)",
+              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Adbt%2Cb2fd91.ORDER_ENTRY_DB.analytics.order_details%2CPROD%29",
+              "evidence": {
+                "transformation_dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)",
+                "feature_source_dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
+                "definition_changed_at": "2026-07-19T19:23:04.708712+00:00",
+                "changed_days": 9,
+                "latest_training_run_urn": "urn:li:dataProcessInstance:customer_churn_predictor_v1-run-0",
+                "latest_training_run_at": "2026-06-12T19:23:02.720000+00:00"
+              },
+              "lineage_path": [
+                {
+                  "type": "dataset",
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)",
+                  "name": "b2fd91.ORDER_ENTRY_DB.analytics.order_details",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Adbt%2Cb2fd91.ORDER_ENTRY_DB.analytics.order_details%2CPROD%29",
+                  "ignition": true
+                },
+                {
+                  "type": "dataset",
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
+                  "name": "b2fd91.order_entry_db.analytics.order_details",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.analytics.order_details%2CPROD%29",
+                  "ignition": false
+                },
+                {
+                  "type": "dataProcessInstance",
+                  "urn": "urn:li:dataProcessInstance:customer_churn_predictor_v1-run-0",
+                  "name": "customer_churn_predictor_v1-run-0",
+                  "url": null,
+                  "ignition": false
+                },
+                {
+                  "type": "mlModel",
+                  "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,customer_churn_predictor_v1,PROD)",
+                  "name": "customer_churn_predictor_v1",
+                  "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Ccustomer_churn_predictor_v1%2CPROD%29",
+                  "ignition": false
+                }
+              ]
+            }
+          ],
+          "coverage_gaps": []
         }
       },
-      "findings": [
-        {
-          "detector": "D2",
-          "summary": "customer_churn_predictor_v1's feature customer_credit_limit points at b2fd91.order_entry_db.order_entry.customers.credit_limit, missing for 3 day(s); last trained 2026-06-12, before the schema changed.",
-          "subject": "b2fd91.order_entry_db.order_entry.customers.credit_limit missing 3d",
-          "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
-          "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cb2fd91.order_entry_db.order_entry.customers%2CPROD%29",
-          "evidence": {
-            "feature_urn": "urn:li:mlFeature:(customer_features,customer_credit_limit)",
-            "dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.order_entry.customers,PROD)",
-            "source_column": "credit_limit",
-            "schema_changed_at": "2026-07-25T18:23:15.006195+00:00",
-            "missing_days": 3,
-            "latest_training_run_urn": "urn:li:dataProcessInstance:customer_churn_predictor_v1-run-0",
-            "latest_training_run_at": "2026-06-12T18:23:13.110000+00:00"
-          }
-        },
-        {
-          "detector": "D3",
-          "summary": "b2fd91.ORDER_ENTRY_DB.analytics.order_details's transformation logic changed 9 day(s) ago; customer_churn_predictor_v1 last trained 2026-06-12, still assumes the old definition.",
-          "subject": "b2fd91.ORDER_ENTRY_DB.analytics.order_details logic changed 9d ago",
-          "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)",
-          "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Adbt%2Cb2fd91.ORDER_ENTRY_DB.analytics.order_details%2CPROD%29",
-          "evidence": {
-            "transformation_dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,b2fd91.ORDER_ENTRY_DB.analytics.order_details,PROD)",
-            "feature_source_dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,b2fd91.order_entry_db.analytics.order_details,PROD)",
-            "definition_changed_at": "2026-07-19T18:23:15.006195+00:00",
-            "changed_days": 9,
-            "latest_training_run_urn": "urn:li:dataProcessInstance:customer_churn_predictor_v1-run-0",
-            "latest_training_run_at": "2026-06-12T18:23:13.110000+00:00"
-          }
-        }
-      ],
       "tags": {
         "at_risk": true,
         "unassessable": false
@@ -386,7 +568,8 @@
       "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Ctaxi_fare_predictor_v1%2CPROD%29",
       "group": {
         "urn": "urn:li:mlModelGroup:(urn:li:dataPlatform:mlflow,taxi_eta_models,PROD)",
-        "name": "taxi_eta_models"
+        "name": "taxi_eta_models",
+        "url": null
       },
       "serving_stages": [
         "STAGING"
@@ -408,24 +591,26 @@
           "conclusive": true,
           "subjects_checked": 1,
           "finding_count": 0,
-          "missing": []
+          "findings": [],
+          "coverage_gaps": []
         },
         "D2": {
           "status": "PASS",
           "conclusive": true,
           "subjects_checked": 3,
           "finding_count": 0,
-          "missing": []
+          "findings": [],
+          "coverage_gaps": []
         },
         "D3": {
           "status": "PASS",
           "conclusive": true,
           "subjects_checked": 3,
           "finding_count": 0,
-          "missing": []
+          "findings": [],
+          "coverage_gaps": []
         }
       },
-      "findings": [],
       "tags": {
         "at_risk": false,
         "unassessable": false

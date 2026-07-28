@@ -28,6 +28,11 @@ from detectors.models import (
 )
 
 DETECTOR = "D2"
+TITLE = "Schema drift under a feature"
+DESCRIPTION = (
+    "A feature's source column is gone from the current schema, and it disappeared "
+    "after the model's last training run - so serving reads nulls."
+)
 
 
 def detect(

@@ -27,6 +27,11 @@ from detectors.models import (
 )
 
 DETECTOR = "D1"
+TITLE = "Frozen training source"
+DESCRIPTION = (
+    "An upstream dataset stopped receiving real updates, but training runs that "
+    "consume it keep firing on schedule."
+)
 DEFAULT_FRESHNESS_THRESHOLD_DAYS = 2
 
 

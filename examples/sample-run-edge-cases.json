@@ -1,0 +1,349 @@
+{
+  "schema_version": "1.0.0",
+  "run": {
+    "assessed_at": "2026-08-01T12:00:00+00:00",
+    "clock_overridden": false,
+    "datahub_base_url": "http://localhost:9002",
+    "models_assessed": 3,
+    "datasets_examined": 2,
+    "detectors": [
+      "D1",
+      "D2",
+      "D3"
+    ]
+  },
+  "detectors_meta": {
+    "D1": {
+      "title": "Frozen training source",
+      "description": "An upstream dataset stopped receiving real updates, but training runs that consume it keep firing on schedule.",
+      "weight": 0.8
+    },
+    "D2": {
+      "title": "Schema drift under a feature",
+      "description": "A feature's source column is gone from the current schema, and it disappeared after the model's last training run - so serving reads nulls.",
+      "weight": 1.0
+    },
+    "D3": {
+      "title": "Semantic change without retrain",
+      "description": "An upstream dbt/Spark transformation changed its logic after the model's last training run - same schema, different meaning.",
+      "weight": 0.6
+    }
+  },
+  "scoring": {
+    "max_possible_score": 3.0,
+    "detector_weights": {
+      "D1": 0.8,
+      "D2": 1.0,
+      "D3": 0.6
+    },
+    "environment_weights": {
+      "PROD": 3.0,
+      "STAGING": 1.0
+    },
+    "latent_risk_floor": 0.5,
+    "severity_thresholds": {
+      "HIGH": 2.0,
+      "MEDIUM": 0.7
+    },
+    "statuses": [
+      "PASS",
+      "FINDING",
+      "INSUFFICIENT_DATA"
+    ]
+  },
+  "models": [
+    {
+      "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,session_bounce_predictor_v1,PROD)",
+      "name": "session_bounce_predictor_v1",
+      "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Csession_bounce_predictor_v1%2CPROD%29",
+      "group": {
+        "urn": "urn:li:mlModelGroup:(urn:li:dataPlatform:mlflow,session_models,PROD)",
+        "name": "session_models",
+        "url": null
+      },
+      "serving_stages": [
+        "STAGING"
+      ],
+      "score": 0.6,
+      "severity": "LOW",
+      "blast_radius": 1.0,
+      "finding_count": 1,
+      "coverage": {
+        "conclusive": 3,
+        "total": 3,
+        "label": "3/3",
+        "fully_covered": true,
+        "unassessable": false
+      },
+      "detectors": {
+        "D1": {
+          "status": "PASS",
+          "conclusive": true,
+          "subjects_checked": 1,
+          "finding_count": 0,
+          "findings": [],
+          "coverage_gaps": []
+        },
+        "D2": {
+          "status": "PASS",
+          "conclusive": true,
+          "subjects_checked": 1,
+          "finding_count": 0,
+          "findings": [],
+          "coverage_gaps": []
+        },
+        "D3": {
+          "status": "FINDING",
+          "conclusive": true,
+          "subjects_checked": 1,
+          "finding_count": 1,
+          "findings": [
+            {
+              "detector": "D3",
+              "summary": "acme.warehouse.analytics.sessions (dbt)'s transformation logic changed 11 day(s) ago; session_bounce_predictor_v1 last trained 2026-07-12, still assumes the old definition.",
+              "subject": "acme.warehouse.analytics.sessions logic changed 11d ago",
+              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,acme.warehouse.analytics.sessions,PROD)",
+              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Adbt%2Cacme.warehouse.analytics.sessions%2CPROD%29",
+              "evidence": {
+                "transformation_dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,acme.warehouse.analytics.sessions,PROD)",
+                "feature_source_dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,acme.warehouse.analytics.sessions,PROD)",
+                "definition_changed_at": "2026-07-21T12:00:00+00:00",
+                "changed_days": 11,
+                "latest_training_run_urn": "urn:li:dataProcessInstance:edge-case-run-0",
+                "latest_training_run_at": "2026-07-12T12:00:00+00:00"
+              },
+              "lineage_path": [
+                {
+                  "type": "dataset",
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:dbt,acme.warehouse.analytics.sessions,PROD)",
+                  "name": "acme.warehouse.analytics.sessions (dbt)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Adbt%2Cacme.warehouse.analytics.sessions%2CPROD%29",
+                  "ignition": true
+                },
+                {
+                  "type": "dataset",
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,acme.warehouse.analytics.sessions,PROD)",
+                  "name": "acme.warehouse.analytics.sessions",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cacme.warehouse.analytics.sessions%2CPROD%29",
+                  "ignition": false
+                },
+                {
+                  "type": "dataProcessInstance",
+                  "urn": "urn:li:dataProcessInstance:edge-case-run-0",
+                  "name": "edge-case-run-0",
+                  "url": null,
+                  "ignition": false
+                },
+                {
+                  "type": "mlModel",
+                  "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,session_bounce_predictor_v1,PROD)",
+                  "name": "session_bounce_predictor_v1",
+                  "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Csession_bounce_predictor_v1%2CPROD%29",
+                  "ignition": false
+                }
+              ]
+            }
+          ],
+          "coverage_gaps": []
+        }
+      },
+      "tags": {
+        "at_risk": false,
+        "unassessable": false
+      },
+      "assessment_document_urn": "urn:li:document:deadreckon-risk-session_bounce_predictor_v1"
+    },
+    {
+      "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,session_length_predictor_v0,PROD)",
+      "name": "session_length_predictor_v0",
+      "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Csession_length_predictor_v0%2CPROD%29",
+      "group": {
+        "urn": "urn:li:mlModelGroup:(urn:li:dataPlatform:mlflow,session_models,PROD)",
+        "name": "session_models",
+        "url": null
+      },
+      "serving_stages": [],
+      "score": 0.5,
+      "severity": "LOW",
+      "blast_radius": 0.5,
+      "finding_count": 1,
+      "coverage": {
+        "conclusive": 3,
+        "total": 3,
+        "label": "3/3",
+        "fully_covered": true,
+        "unassessable": false
+      },
+      "detectors": {
+        "D1": {
+          "status": "PASS",
+          "conclusive": true,
+          "subjects_checked": 1,
+          "finding_count": 0,
+          "findings": [],
+          "coverage_gaps": []
+        },
+        "D2": {
+          "status": "FINDING",
+          "conclusive": true,
+          "subjects_checked": 1,
+          "finding_count": 1,
+          "findings": [
+            {
+              "detector": "D2",
+              "summary": "session_length_predictor_v0's feature session_length_p95 points at acme.warehouse.analytics.sessions.session_length, missing for 6 day(s); last trained 2026-07-12, before the schema changed.",
+              "subject": "acme.warehouse.analytics.sessions.session_length missing 6d",
+              "subject_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,acme.warehouse.analytics.sessions,PROD)",
+              "subject_url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cacme.warehouse.analytics.sessions%2CPROD%29",
+              "evidence": {
+                "feature_urn": "urn:li:mlFeature:(session_features,session_length_p95)",
+                "dataset_urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,acme.warehouse.analytics.sessions,PROD)",
+                "source_column": "session_length",
+                "schema_changed_at": "2026-07-26T12:00:00+00:00",
+                "missing_days": 6,
+                "latest_training_run_urn": "urn:li:dataProcessInstance:edge-case-run-0",
+                "latest_training_run_at": "2026-07-12T12:00:00+00:00"
+              },
+              "lineage_path": [
+                {
+                  "type": "dataset",
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,acme.warehouse.analytics.sessions,PROD)",
+                  "name": "acme.warehouse.analytics.sessions",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cacme.warehouse.analytics.sessions%2CPROD%29",
+                  "ignition": true
+                },
+                {
+                  "type": "mlFeature",
+                  "urn": "urn:li:mlFeature:(session_features,session_length_p95)",
+                  "name": "session_length_p95",
+                  "url": null,
+                  "ignition": false
+                },
+                {
+                  "type": "dataProcessInstance",
+                  "urn": "urn:li:dataProcessInstance:edge-case-run-0",
+                  "name": "edge-case-run-0",
+                  "url": null,
+                  "ignition": false
+                },
+                {
+                  "type": "mlModel",
+                  "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,session_length_predictor_v0,PROD)",
+                  "name": "session_length_predictor_v0",
+                  "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Csession_length_predictor_v0%2CPROD%29",
+                  "ignition": false
+                }
+              ]
+            }
+          ],
+          "coverage_gaps": []
+        },
+        "D3": {
+          "status": "PASS",
+          "conclusive": true,
+          "subjects_checked": 1,
+          "finding_count": 0,
+          "findings": [],
+          "coverage_gaps": []
+        }
+      },
+      "tags": {
+        "at_risk": false,
+        "unassessable": false
+      },
+      "assessment_document_urn": "urn:li:document:deadreckon-risk-session_length_predictor_v0"
+    },
+    {
+      "urn": "urn:li:mlModel:(urn:li:dataPlatform:mlflow,session_ltv_predictor_v2,PROD)",
+      "name": "session_ltv_predictor_v2",
+      "url": "http://localhost:9002/mlModels/urn%3Ali%3AmlModel%3A%28urn%3Ali%3AdataPlatform%3Amlflow%2Csession_ltv_predictor_v2%2CPROD%29",
+      "group": {
+        "urn": "urn:li:mlModelGroup:(urn:li:dataPlatform:mlflow,session_models,PROD)",
+        "name": "session_models",
+        "url": null
+      },
+      "serving_stages": [
+        "PROD"
+      ],
+      "score": 0.0,
+      "severity": "LOW",
+      "blast_radius": 3.0,
+      "finding_count": 0,
+      "coverage": {
+        "conclusive": 0,
+        "total": 3,
+        "label": "0/3",
+        "fully_covered": false,
+        "unassessable": true
+      },
+      "detectors": {
+        "D1": {
+          "status": "INSUFFICIENT_DATA",
+          "conclusive": false,
+          "subjects_checked": 0,
+          "finding_count": 0,
+          "findings": [],
+          "coverage_gaps": [
+            {
+              "aspect": "operation.lastUpdatedTimestamp",
+              "count": 1,
+              "subjects": [
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,acme.warehouse.analytics.sessions,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cacme.warehouse.analytics.sessions%2CPROD%29",
+                  "detail": "acme.warehouse.analytics.sessions has no operation.lastUpdatedTimestamp"
+                }
+              ]
+            }
+          ]
+        },
+        "D2": {
+          "status": "INSUFFICIENT_DATA",
+          "conclusive": false,
+          "subjects_checked": 0,
+          "finding_count": 0,
+          "findings": [],
+          "coverage_gaps": [
+            {
+              "aspect": "deadreckon.schemaChangedAt",
+              "count": 1,
+              "subjects": [
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,acme.warehouse.analytics.sessions,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cacme.warehouse.analytics.sessions%2CPROD%29",
+                  "detail": "acme.warehouse.analytics.sessions has no deadreckon.schemaChangedAt"
+                }
+              ]
+            }
+          ]
+        },
+        "D3": {
+          "status": "INSUFFICIENT_DATA",
+          "conclusive": false,
+          "subjects_checked": 0,
+          "finding_count": 0,
+          "findings": [],
+          "coverage_gaps": [
+            {
+              "aspect": "deadreckon.definitionChangedAt",
+              "count": 1,
+              "subjects": [
+                {
+                  "urn": "urn:li:dataset:(urn:li:dataPlatform:snowflake,acme.warehouse.analytics.sessions,PROD)",
+                  "url": "http://localhost:9002/dataset/urn%3Ali%3Adataset%3A%28urn%3Ali%3AdataPlatform%3Asnowflake%2Cacme.warehouse.analytics.sessions%2CPROD%29",
+                  "detail": "acme.warehouse.analytics.sessions has no deadreckon.definitionChangedAt"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "tags": {
+        "at_risk": false,
+        "unassessable": true
+      },
+      "assessment_document_urn": "urn:li:document:deadreckon-risk-session_ltv_predictor_v2"
+    }
+  ],
+  "_note": "SYNTHETIC. Hand-built states the seeded fixture cannot reach without changing the demo matrix - see examples/generate_edge_cases.py. Same schema and serializer as a real run. sample-run.json is the real one."
+}

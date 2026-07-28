@@ -154,7 +154,7 @@ def main() -> None:
         print_matrix(scored)
 
     if args.json:
-        report = build_report(scored, now, args.datahub_url, len(datasets), clock.is_overridden())
+        report = build_report(scored, now, args.datahub_url, datasets, clock.is_overridden())
         Path(args.json).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
         print(f"\nWrote {args.json} (schema {report['schema_version']})")
 

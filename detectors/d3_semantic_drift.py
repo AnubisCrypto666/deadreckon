@@ -28,6 +28,11 @@ from detectors.models import (
 )
 
 DETECTOR = "D3"
+TITLE = "Semantic change without retrain"
+DESCRIPTION = (
+    "An upstream dbt/Spark transformation changed its logic after the model's last "
+    "training run - same schema, different meaning."
+)
 
 
 def detect(
