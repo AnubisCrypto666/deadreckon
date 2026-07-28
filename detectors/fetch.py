@@ -169,6 +169,12 @@ def fetch_dataset_snapshot(graph: DataHubGraph, dataset_urn: str, now: datetime 
     )
 
 
+def _name_from_ml_group_urn(group_urn: str) -> str:
+    # urn:li:mlModelGroup:(urn:li:dataPlatform:<platform>,<name>,<env>)
+    parts = group_urn.split(",")
+    return parts[-2] if len(parts) >= 2 else group_urn
+
+
 def _platform_of(dataset_urn: str) -> str:
     # urn:li:dataset:(urn:li:dataPlatform:<platform>,<name>,<env>)
     match = re.search(r"urn:li:dataPlatform:([^,]+)", dataset_urn)
@@ -201,12 +207,17 @@ def fetch_model_snapshot(graph: DataHubGraph, model_urn: str) -> ModelSnapshot |
     structured_props = graph.get_aspect(entity_urn=model_urn, aspect_type=StructuredPropertiesClass)
     deployment_environments = _string_list_property(structured_props, DEPLOYMENT_ENV_PROPERTY_URN)
 
+    group_urn = props.groups[0] if props.groups else None
+    group_name = _name_from_ml_group_urn(group_urn) if group_urn else None
+
     return ModelSnapshot(
         urn=model_urn,
         name=props.name or model_urn,
         training_runs=tuple(training_runs),
         features=tuple(features),
         deployment_environments=deployment_environments,
+        group_urn=group_urn,
+        group_name=group_name,
     )
 
 

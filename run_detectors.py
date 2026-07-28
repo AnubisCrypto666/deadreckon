@@ -10,15 +10,18 @@ Usage:
 """
 
 import argparse
+import json
 from datetime import datetime
+from pathlib import Path
 
 from datahub.ingestion.graph.client import get_default_graph
 
 from detectors import clock, d1_frozen_source, d2_schema_drift, d3_semantic_drift
 from detectors.fetch import fetch_all_model_snapshots, fetch_dataset_snapshots
 from detectors.models import DetectorResult, DetectorStatus, ModelSnapshot
+from detectors.report import build_report
 from detectors.scoring import MAX_POSSIBLE_SCORE, ModelRiskScore, is_at_risk, score_model
-from detectors.writeback import ensure_writeback_definitions, write_risk_assessment
+from detectors.writeback import FRONTEND_BASE_URL, ensure_writeback_definitions, write_risk_assessment
 
 DETECTOR_ORDER = ("D1", "D2", "D3")
 STATUS_GLYPHS = {
@@ -86,6 +89,10 @@ def main() -> None:
     parser.add_argument("--matrix", action="store_true", help="print the model x detector state matrix")
     parser.add_argument("--as-of", type=str, default=None,
                          help="ISO timestamp to assess against (default: DEADRECKON_NOW, else real now)")
+    parser.add_argument("--json", type=str, default=None, metavar="PATH",
+                         help="write the full run as JSON (see docs/output-schema.md)")
+    parser.add_argument("--datahub-url", type=str, default=FRONTEND_BASE_URL,
+                         help="DataHub UI base URL used to build entity links in --json output")
     args = parser.parse_args()
 
     now = clock.now(args.as_of)
@@ -145,6 +152,11 @@ def main() -> None:
     if args.matrix:
         print()
         print_matrix(scored)
+
+    if args.json:
+        report = build_report(scored, now, args.datahub_url, len(datasets), clock.is_overridden())
+        Path(args.json).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+        print(f"\nWrote {args.json} (schema {report['schema_version']})")
 
 
 if __name__ == "__main__":

@@ -53,6 +53,8 @@ class ModelSnapshot:
     training_runs: tuple[TrainingRun, ...]
     features: tuple[Feature, ...]
     deployment_environments: tuple[str, ...] = ()
+    group_urn: str | None = None
+    group_name: str | None = None
 
     @property
     def latest_training_run(self) -> TrainingRun | None:

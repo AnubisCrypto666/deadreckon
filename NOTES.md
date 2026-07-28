@@ -554,6 +554,28 @@ material for OSS doc-fix contributions.
   `deadreckon.definitionChangedAt` structured properties instead (see
   `seed/inject_faults.py`).
 
+- `datahub docker quickstart`'s preflight memory check (`MIN_MEMORY_NEEDED
+  = 4.3` GB in `datahub/cli/docker_check.py`) is set below what the stack
+  it starts actually needs. Measured on this machine: the six quickstart
+  containers idle at **~4.2 GiB combined** (GMS 1.6, OpenSearch 1.3,
+  kafka-broker 0.78, frontend 0.70, mysql 0.56, actions 0.24), so a user
+  who allocates exactly the documented minimum passes the check with
+  essentially zero headroom and then hits trouble under real indexing
+  load. Observed concretely here at a *9.7 GB* allocation: OpenSearch died
+  with `java.lang.OutOfMemoryError: unable to create native thread ...
+  pthread_create failed (EAGAIN)`. Notably it was not heap exhaustion -
+  the quickstart caps OpenSearch at `-Xmx1024m` - but thread stacks:
+  ~1300 live threads at the JVM's 1 MB default stack is another ~1.3 GB
+  of committed memory outside the heap, and OpenSearch sizes its pools
+  off the host CPU count (8 here). Downstream symptom is confusing:
+  GMS starts returning `ESQueryException: Search query failed ... Name
+  does not resolve` on any search-backed GraphQL field, which reads like
+  a DNS/config problem rather than a dead container. Worth upstreaming
+  either a higher preflight minimum, or a `node.processors` /
+  `-Xss` cap in the quickstart compose so the thread-stack footprint
+  doesn't scale with the host's core count. Documented in our README as
+  an 8 GB requirement.
+
 - The standalone `Document` entity (created via `save_document`/
   `createDocument`) has **no working profile route anywhere in this
   DataHub version's frontend** - confirmed 404 two independent ways: a
