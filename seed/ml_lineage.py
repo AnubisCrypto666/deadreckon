@@ -94,13 +94,6 @@ ORDER_DETAILS = _dataset_urn("snowflake", "b2fd91.order_entry_db.analytics.order
 TAXI_RAW = _dataset_urn("sqlite", "nyc_taxi_pipeline.main.raw_trips")
 TAXI_STAGING = _dataset_urn("sqlite", "nyc_taxi_pipeline.main.staging_trips")
 
-# feature_table -> real upstream datasets a training run against it actually reads
-TRAINING_RUN_INPUTS = {
-    "customer_features": [CUSTOMERS],
-    "order_features": [ORDER_DETAILS, ORDERS, ORDER_ITEMS],
-    "taxi_trip_features": [TAXI_RAW, TAXI_STAGING],
-}
-
 # feature_table -> { feature_name: (source_dataset, source_column, dataType, description) }
 FEATURE_TABLES = {
     "customer_features": {
@@ -227,7 +220,14 @@ MODELS = {
         "hyperparams": {"model_type": "xgboost", "max_depth": "6"},
         "metrics": {"mae_dollars": "1.35"},
         "runs": [{"days_ago": 2, "duration_min": 14}],
-        "deployment": None,
+        # The control model: reads only raw_trips (which is fresh), all
+        # its source columns exist, and raw_trips has no upstream
+        # transformation - so all three detectors reach a verdict and all
+        # three pass. Deployed rather than left undeployed so "clean"
+        # can't be dismissed as "of course, it isn't serving anything";
+        # this is a model actually in front of traffic that the agent
+        # checked completely and cleared.
+        "deployment": "STAGING",
     },
 }
 
@@ -297,9 +297,30 @@ def emit_model_groups(graph) -> None:
     print(f"  {len(MODEL_GROUPS)} mlModelGroups")
 
 
+def training_run_inputs(model_def: dict) -> list[str]:
+    """Datasets a run actually reads: the sources of *this model's own*
+    features, not everything its feature tables happen to touch.
+
+    Deriving inputs per feature-table over-declares lineage for any model
+    that uses a subset of a table's features - taxi_fare_predictor_v1
+    reads only raw_trips columns, but the table-level list also names
+    staging_trips, so D1 (correctly, given what the graph claimed) flagged
+    it for training on a frozen source it never actually reads. Fixing the
+    over-declaration is a lineage correction, not a way of hiding the
+    finding: staging_trips stays frozen, D1's threshold is untouched, and
+    taxi_eta_predictor_v1 - whose avg_trip_duration_min genuinely does
+    read staging_trips - keeps its finding.
+    """
+    sources = set()
+    for qualified_name in model_def["features"]:
+        table_name, feature_name = qualified_name.split(".", 1)
+        source_dataset, _column, _data_type, _description = FEATURE_TABLES[table_name]["features"][feature_name]
+        sources.add(source_dataset)
+    return sorted(sources)
+
+
 def emit_training_runs(graph, model_name: str, model_def: dict, now: datetime) -> list[str]:
-    tables_used = {f.split(".", 1)[0] for f in model_def["features"]}
-    run_inputs = sorted({ds for t in tables_used for ds in TRAINING_RUN_INPUTS[t]})
+    run_inputs = training_run_inputs(model_def)
     model_urn = make_ml_model_urn(MODEL_PLATFORM, model_name, FABRIC)
 
     run_urns = []

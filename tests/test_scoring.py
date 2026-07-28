@@ -192,3 +192,58 @@ def test_score_dominates_finding_count_in_the_ranking():
     low_score_many_findings = score_model(_model(("STAGING",)), [_finding_result("D2", count=9)])
 
     assert high_score_one_finding.sort_key < low_score_many_findings.sort_key
+
+
+# --- latent risk floor -----------------------------------------------------
+# No seeded model is undeployed (the control model is deployed to STAGING
+# on purpose, so "clean" can't be read as "not serving anything"). That
+# means this tier never appears in the demo data and these tests are its
+# only coverage - keep them exhaustive rather than illustrative.
+
+def test_latent_floor_produces_exact_expected_scores_per_detector():
+    for detector, weight in DETECTOR_WEIGHTS.items():
+        scored = score_model(_model(()), [_finding_result(detector)])
+        assert scored.blast_radius == LATENT_RISK_FLOOR
+        assert scored.score == round(weight * LATENT_RISK_FLOOR, 2)
+
+
+def test_undeployed_model_with_a_finding_is_still_scored_and_ranked():
+    """An undeployed model must not silently drop out of the table - the
+    finding is real, it just isn't serving traffic yet."""
+    scored = score_model(_model(()), [_finding_result("D2")])
+    assert scored.score > 0
+    assert scored.finding_count == 1
+    assert scored.sort_key is not None
+    assert not is_at_risk(scored.severity)
+
+
+def test_undeployed_always_ranks_below_any_deployed_model_with_a_finding():
+    strongest_undeployed = score_model(_model(()), [_finding_result(d) for d in DETECTOR_WEIGHTS])
+    weakest_staging = score_model(_model(("STAGING",)),
+                                   [_finding_result(min(DETECTOR_WEIGHTS, key=DETECTOR_WEIGHTS.get))])
+    assert weakest_staging.sort_key < strongest_undeployed.sort_key
+
+
+def test_latent_floor_is_strictly_between_zero_and_the_lowest_deployed_score():
+    lowest_deployed = min(DETECTOR_WEIGHTS.values()) * min(ENVIRONMENT_WEIGHTS.values())
+    highest_latent = max(DETECTOR_WEIGHTS.values()) * LATENT_RISK_FLOOR
+    assert 0 < highest_latent < lowest_deployed
+
+
+# --- clean models stay in the table ---------------------------------------
+
+def test_clean_model_scores_zero_but_still_produces_a_sortable_result():
+    """The control model scores 0.0 - it must still be a first-class row
+    (document + properties get written for it) rather than vanishing."""
+    scored = score_model(_model(("STAGING",)), [_pass_result(d) for d in DETECTOR_WEIGHTS])
+    assert scored.score == 0.0
+    assert scored.finding_count == 0
+    assert scored.coverage.is_fully_covered
+    assert not is_at_risk(scored.severity)
+    assert not scored.coverage.is_unassessable
+
+
+def test_clean_model_sorts_last_behind_every_model_with_a_finding():
+    clean = score_model(_model(("PROD",)), [_pass_result(d) for d in DETECTOR_WEIGHTS])
+    faintest_finding = score_model(_model(()), [_finding_result(min(DETECTOR_WEIGHTS, key=DETECTOR_WEIGHTS.get))])
+    assert faintest_finding.sort_key < clean.sort_key
