@@ -605,6 +605,14 @@ material for OSS doc-fix contributions.
   18864. Same leak, different binding limit, so time-to-crash varies by
   platform - the fix is the same either way.
 
+  **Filed upstream 2026-07-28** as a confirming comment on #18657:
+  https://github.com/datahub-project/datahub/issues/18657#issuecomment-5108977744
+  (draft kept at `docs/oss/comment-18657-zombie-reaping.md`). It includes
+  the correction of our own misdiagnosis and the `/proc/*/task` measurement
+  error, on the grounds that the next person to land on that issue with the
+  same wrong hunch benefits more from seeing it than we lose by admitting
+  it - and our repo is public, so silence would be the worse look.
+
 - The standalone `Document` entity (created via `save_document`/
   `createDocument`) has **no working profile route anywhere in this
   DataHub version's frontend** - confirmed 404 two independent ways: a
@@ -624,6 +632,21 @@ material for OSS doc-fix contributions.
   are API/MCP-only in this version and should be surfaced via
   `institutionalMemory`/tags/properties on the entities they're attached
   to if a human needs to see them in the UI.
+
+  **Filed upstream 2026-07-28** as a comment on #18675 (someone else's
+  issue about Documents not appearing in search, which we independently
+  reproduced on the same version):
+  https://github.com/datahub-project/datahub/issues/18675#issuecomment-5108983658
+  (draft at `docs/oss/comment-18675-document-visibility.md`). Went there
+  rather than opening a third document-related issue; the no-route finding
+  is offered for splitting out if maintainers consider it distinct from
+  the indexing question.
+
+  Re-measured immediately before filing, on documents ~3h old (i.e. well
+  past any indexing window): direct URN fetch returns the title,
+  `relatedDocuments` on the attached model returns 1, and
+  `searchAcrossEntities` with `types:[DOCUMENT]` returns **0** for
+  "Model Risk Assessment", "taxi_eta_predictor_v1" and "deadreckon" alike.
 
 ## Sesja 28.07 - decyzje
 

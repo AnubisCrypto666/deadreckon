@@ -144,6 +144,18 @@ disclosed here per the project's own rule: a demo that only finds what we
 hid five minutes earlier isn't worth trusting. See `NOTES.md` for the
 exact details and the timestamps used.
 
+## Upstream contributions
+
+Issues found while building this and reported back to DataHub:
+
+- **[#18657](https://github.com/datahub-project/datahub/issues/18657#issuecomment-5108977744)** — OpenSearch dies about once a day on a stock quickstart. Independent confirmation on macOS/arm64 of someone else's diagnosis: the healthcheck leaks a zombie `curl` every 5s because the JVM is PID 1 and never reaps them. Measured 1060 zombies out of 1062 processes after 90 minutes (~708/hour) against only 140 real JVM threads, plus a platform difference (`pids.max = max` on Docker Desktop) that changes time-to-crash. Includes the correction of our own earlier misdiagnosis and the measurement error behind it. Fix shipped here as [`docker-compose.opensearch-init.yml`](docker-compose.opensearch-init.yml).
+- **[#18675](https://github.com/datahub-project/datahub/issues/18675#issuecomment-5108983658)** — Document entities create successfully but aren't discoverable. Confirmed the reported search symptom on `v1.5.0.6` (document readable by URN and returned by `relatedDocuments`, but `searchAcrossEntities` returns 0 for title, attached-asset name, and a distinctive substring), and extended it: there is no Document profile route at all — a direct URL 404s, and so does the UI's own "Resources" card on the attached entity's Documentation tab.
+
+Further material collected but not yet filed — the `mcp-server-datahub`
+read gaps (`mlModelDeployment`, and `get_entities`/`get_lineage` dropping
+native fields for `mlModel`/`mlFeature`/`dataProcessInstance`) — is
+written up in [`NOTES.md`](NOTES.md).
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE).
