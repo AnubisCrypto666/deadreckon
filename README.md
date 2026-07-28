@@ -32,22 +32,63 @@ Docker Desktop → Settings → Resources → Memory, then *Apply & restart*.
 (On Colima: `colima start --memory 8`.)
 
 This is higher than the 4.3 GB the `datahub` CLI's own preflight check
-enforces, and the gap is deliberate. Measured on this stack, the six
-quickstart containers idle at **~4.2 GB combined** — meaning the official
-minimum passes the preflight check with essentially no headroom left, and
-then falls over under the indexing load of a datapack load or a detector
-run. That is not theoretical: OpenSearch on this machine died with
-`OutOfMemoryError: unable to create native thread` mid-development. It had
-a 1 GB JVM heap but ~1300 live threads at ~1 MB of stack each, so the
-memory pressure was thread stacks rather than heap — which is why raising
-the heap is not the fix, and raising the VM allocation is.
+enforces, simply because that is what the stack measurably uses. With the
+`showcase-ecommerce` datapack loaded, the six quickstart containers idle
+at **~4.23 GiB combined** (≈4.54 GB — already over the 4.3 GB threshold
+before any indexing work):
 
-If OpenSearch does die, the symptom is DataHub returning
-`ESQueryException: ... Name does not resolve` on search-backed queries.
-Recover with `docker start datahub-opensearch-1` — data lives in a volume
-and survives.
+| Container | Idle |
+|---|---|
+| `datahub-gms` | 1.60 GiB |
+| `opensearch` | 1.30 GiB |
+| `kafka-broker` | 780 MiB |
+| `frontend` | 701 MiB |
+| `mysql` | 563 MiB |
+| `datahub-actions` | 236 MiB |
 
-The 13 GB disk figure is the `datahub` CLI's own requirement, unchanged.
+8 GB leaves room for the indexing spikes of a datapack load or a detector
+run. The 13 GB disk figure is the `datahub` CLI's own requirement,
+unchanged.
+
+### Known issue: OpenSearch dies about once a day
+
+Unrelated to memory. On a stock quickstart, the `opensearch` container
+leaks one zombie `curl` per healthcheck (every 5s) because the JVM is PID
+1 and never reaps them, so PID slots fill up and the JVM eventually fails
+to create a thread. Upstream:
+[datahub-project/datahub#18657](https://github.com/datahub-project/datahub/issues/18657).
+Confirmed on this machine: 1060 zombies out of 1062 processes after 90
+minutes of uptime (~708/hour), against only 140 real JVM threads.
+
+The symptom is confusing — DataHub keeps serving entity-by-URN reads while
+every search-backed query fails with
+`ESQueryException: ... Name does not resolve`, which reads like a DNS
+problem rather than a dead container.
+
+This repo ships the upstream fix as an overlay
+([`docker-compose.opensearch-init.yml`](docker-compose.opensearch-init.yml) —
+`init: true`, so Docker runs tini as PID 1 and reaps the healthcheck
+children). Start the stack with it:
+
+```bash
+datahub docker quickstart \
+  -f ~/.datahub/quickstart/docker-compose.yml \
+  -f docker-compose.opensearch-init.yml
+```
+
+Two things make this work rather than being overwritten: `docker compose`
+merges later `-f` files over earlier ones, and passing `-f` at all makes
+the CLI **skip re-downloading** the generated file, so the base stays
+pristine. Editing `~/.datahub/quickstart/docker-compose.yml` in place does
+*not* survive — `datahub docker quickstart` rewrites that file (`open(...,
+"wb")`) on every run without `-f`.
+
+Verified by merging the two files and inspecting the result: `init: true`
+lands on `opensearch` only, with its image, healthcheck, JVM options and
+volumes untouched.
+
+Recovery if it does die: `docker start datahub-opensearch-1` — data lives
+in a volume and survives.
 
 ## Detectors
 

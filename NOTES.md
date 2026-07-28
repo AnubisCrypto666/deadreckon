@@ -556,25 +556,54 @@ material for OSS doc-fix contributions.
 
 - `datahub docker quickstart`'s preflight memory check (`MIN_MEMORY_NEEDED
   = 4.3` GB in `datahub/cli/docker_check.py`) is set below what the stack
-  it starts actually needs. Measured on this machine: the six quickstart
-  containers idle at **~4.2 GiB combined** (GMS 1.6, OpenSearch 1.3,
-  kafka-broker 0.78, frontend 0.70, mysql 0.56, actions 0.24), so a user
-  who allocates exactly the documented minimum passes the check with
-  essentially zero headroom and then hits trouble under real indexing
-  load. Observed concretely here at a *9.7 GB* allocation: OpenSearch died
-  with `java.lang.OutOfMemoryError: unable to create native thread ...
-  pthread_create failed (EAGAIN)`. Notably it was not heap exhaustion -
-  the quickstart caps OpenSearch at `-Xmx1024m` - but thread stacks:
-  ~1300 live threads at the JVM's 1 MB default stack is another ~1.3 GB
-  of committed memory outside the heap, and OpenSearch sizes its pools
-  off the host CPU count (8 here). Downstream symptom is confusing:
-  GMS starts returning `ESQueryException: Search query failed ... Name
-  does not resolve` on any search-backed GraphQL field, which reads like
-  a DNS/config problem rather than a dead container. Worth upstreaming
-  either a higher preflight minimum, or a `node.processors` /
-  `-Xss` cap in the quickstart compose so the thread-stack footprint
-  doesn't scale with the host's core count. Documented in our README as
-  an 8 GB requirement.
+  it starts actually uses. Measured here with the showcase datapack
+  loaded: the six containers idle at **~4.23 GiB combined** (GMS 1.60,
+  OpenSearch 1.30, kafka-broker 0.78, frontend 0.70, mysql 0.56, actions
+  0.24) - that is ~4.54 GB, already over the threshold before any indexing
+  work. The comment above the constant ("Docker seems to under-report
+  memory allocated, so we also need a bit of buffer") suggests it was
+  picked as "4 GB plus buffer" rather than measured against the running
+  stack. Caveat on our own evidence: we never ran the stack *at* a 4.3 GB
+  allocation, only measured footprint on a 9.7 GB one - so this is a
+  constant-vs-measurement mismatch, not a demonstrated failure. Documented
+  in our README as an 8 GB requirement.
+
+- **OpenSearch dying roughly daily is a zombie-reaping bug, NOT memory -
+  and our first diagnosis of it was wrong.** Corrected 2026-07-28 after
+  finding upstream issue
+  [#18657](https://github.com/datahub-project/datahub/issues/18657), filed
+  a day earlier by someone else with a far better root cause than ours.
+  The `opensearch` healthcheck runs `curl` in-container every 5s, but PID
+  1 there is the JVM, which never reaps orphaned children, so every
+  healthcheck leaves a permanent zombie. PID slots fill and the JVM
+  eventually cannot create a thread:
+  `OutOfMemoryError: unable to create native thread ... pthread_create
+  failed (EAGAIN)`, with `OOMKilled=false` and free memory to spare.
+  Confirmed independently on this machine: **1060 zombies out of 1062
+  processes** after 90 minutes of uptime (~708/hour, against the 720/hour
+  a 5s interval predicts), while the JVM held only **140** real threads.
+  Fix is `init: true` on the service so Docker runs tini as PID 1; shipped
+  here as `docker-compose.opensearch-init.yml`.
+
+  **The methodological error is worth remembering, because it was the
+  whole reason the wrong theory looked plausible:** we counted "threads"
+  with `ls /proc/*/task | wc -l`, which walks the task directory of
+  *every process in the container*. With thousands of zombies present that
+  returns a huge number (3042 at the time) that looks exactly like runaway
+  thread creation. The right probe for "how many threads does this process
+  have" is `ls /proc/<pid>/task | wc -l` against the specific PID - here
+  `/proc/1/task`, giving 140. Two further signals we had and did not
+  weigh: free memory was ~5.5 GB at the time of measurement (a 1 MB stack
+  allocation should not fail), and `OOMKilled=false` with nothing in
+  `dmesg` points at a *resource-limit* death rather than a memory kill.
+  Lesson: when a JVM says "possibly out of memory **or process/resource
+  limits reached**", check the second clause before building a theory on
+  the first.
+
+  Platform difference worth noting: our `pids.max` reads `max` (Docker
+  Desktop sets no cgroup PID limit), whereas the upstream reporter's was
+  18864. Same leak, different binding limit, so time-to-crash varies by
+  platform - the fix is the same either way.
 
 - The standalone `Document` entity (created via `save_document`/
   `createDocument`) has **no working profile route anywhere in this

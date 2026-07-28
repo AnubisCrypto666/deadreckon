@@ -1,0 +1,31 @@
+# Overlay for `datahub docker quickstart` that stops the OpenSearch
+# container dying roughly once a day.
+#
+# On a stock quickstart the opensearch healthcheck runs `curl` inside the
+# container every 5s, but PID 1 there is the JVM itself, which never reaps
+# orphaned children. Every completed healthcheck leaves a permanent zombie
+# (~708/hour measured here), PID slots fill up, and the JVM eventually
+# dies with `OutOfMemoryError: unable to create native thread` even with
+# gigabytes of free memory. Upstream issue:
+# https://github.com/datahub-project/datahub/issues/18657
+#
+# `init: true` makes Docker run tini as PID 1, which reaps them. This is
+# the fix proposed upstream; the sibling elasticsearch service never had
+# the problem because that image already ships tini.
+#
+# Usage - pass alongside the generated quickstart file, ours last:
+#
+#   datahub docker quickstart \
+#     -f ~/.datahub/quickstart/docker-compose.yml \
+#     -f docker-compose.opensearch-init.yml
+#
+# Passing -f also stops the CLI re-downloading (and overwriting) the
+# generated file, so the base stays pristine and this stays additive.
+# Verify the merge without starting anything:
+#
+#   docker compose -f ~/.datahub/quickstart/docker-compose.yml \
+#     -f docker-compose.opensearch-init.yml config | grep -A2 'opensearch:'
+
+services:
+  opensearch:
+    init: true
