@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 
 
 @dataclass(frozen=True)
@@ -67,3 +68,81 @@ class Finding:
     model_urn: str
     summary: str
     evidence: dict = field(default_factory=dict)
+
+
+class DetectorStatus(str, Enum):
+    """Three states, because "clean" and "couldn't check" are different
+    claims and conflating them is how a metadata-only agent quietly lies.
+
+    A detector that returns no findings because the signal it needs is
+    absent from the graph has not verified anything - it has only failed
+    to look. Saying PASS there would assert something we never checked.
+    """
+
+    PASS = "PASS"
+    """Had the data it needed, checked, found nothing wrong."""
+    FINDING = "FINDING"
+    """Checked and found a real problem."""
+    INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+    """Could not check - a required signal is missing from the graph."""
+
+
+@dataclass(frozen=True)
+class MissingSignal:
+    """What a detector needed and didn't get. Names the aspect/field so
+    the gap is actionable ("go emit this") rather than just "unknown"."""
+
+    subject_urn: str
+    """The entity we couldn't conclusively check."""
+    missing: str
+    """Name of the absent aspect/field, e.g. 'operation.lastUpdatedTimestamp'."""
+    detail: str = ""
+
+
+@dataclass(frozen=True)
+class DetectorResult:
+    detector: str
+    status: DetectorStatus
+    findings: tuple[Finding, ...] = ()
+    missing: tuple[MissingSignal, ...] = ()
+    checked: int = 0
+    """How many subjects (datasets/features/transformations) this detector
+    was able to check conclusively. Kept alongside `missing` so partial
+    coverage stays visible: status is the headline, these are the detail."""
+
+    @property
+    def is_conclusive(self) -> bool:
+        """True when this detector reached a verdict about the model -
+        i.e. it either found something or genuinely verified there was
+        nothing to find. Drives coverage reporting."""
+        return self.status in (DetectorStatus.PASS, DetectorStatus.FINDING)
+
+
+def build_result(
+    detector: str,
+    findings: list[Finding],
+    missing: list[MissingSignal],
+    checked: int,
+) -> DetectorResult:
+    """Aggregate per-subject outcomes into one status for the detector.
+
+    Precedence: a real finding is always the headline, even if some other
+    subject was uncheckable. Absent a finding, *any* uncheckable subject
+    downgrades the whole detector to INSUFFICIENT_DATA rather than PASS -
+    claiming "clean" requires having actually looked at everything. The
+    `checked`/`missing` counts carry the nuance that the single status
+    can't.
+    """
+    if findings:
+        status = DetectorStatus.FINDING
+    elif missing or checked == 0:
+        status = DetectorStatus.INSUFFICIENT_DATA
+    else:
+        status = DetectorStatus.PASS
+    return DetectorResult(
+        detector=detector,
+        status=status,
+        findings=tuple(findings),
+        missing=tuple(missing),
+        checked=checked,
+    )

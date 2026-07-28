@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 
 from datahub.metadata.schema_classes import AuditStampClass, InstitutionalMemoryClass, InstitutionalMemoryMetadataClass
 
-from detectors.models import Finding
-from detectors.scoring import ModelRiskScore
+from detectors.models import Finding, MissingSignal
+from detectors.scoring import AssessmentCoverage, ModelRiskScore
 from detectors.writeback import (
     DEADRECKON_MEMORY_MARKER,
     MAX_INSTITUTIONAL_MEMORY_FINDING_ROWS,
@@ -148,7 +148,8 @@ def test_institutional_memory_preserves_non_deadreckon_elements():
 
 def _risk_with_n_findings(n: int) -> ModelRiskScore:
     findings = tuple(_finding("D1") for _ in range(n))
-    return ModelRiskScore(model_urn=MODEL_URN, findings=findings, blast_radius=3.0, score=2.4, severity="HIGH")
+    return ModelRiskScore(model_urn=MODEL_URN, findings=findings, blast_radius=3.0, score=2.4,
+                           severity="HIGH", coverage=AssessmentCoverage(conclusive=3, total=3))
 
 
 def test_finding_rows_capped_with_summary_row_when_over_limit():
@@ -175,3 +176,74 @@ def test_finding_rows_exactly_at_limit_has_no_summary_row():
 
     assert len(rows) == 1 + MAX_INSTITUTIONAL_MEMORY_FINDING_ROWS
     assert not any("more" in r for r in rows)
+
+
+def _risk(findings=(), conclusive=3, total=3, missing=()) -> ModelRiskScore:
+    return ModelRiskScore(
+        model_urn=MODEL_URN, findings=findings, blast_radius=3.0,
+        score=2.4 if findings else 0.0, severity="HIGH" if findings else "LOW",
+        coverage=AssessmentCoverage(conclusive=conclusive, total=total, missing=missing),
+    )
+
+
+def test_headline_says_clear_when_everything_checked_and_nothing_found():
+    rows = _build_finding_memory_descriptions(_risk())
+    assert len(rows) == 1
+    assert "CLEAR" in rows[0]
+    assert "all 3 detectors checked" in rows[0]
+
+
+def test_headline_distinguishes_partial_coverage_from_a_clean_bill_of_health():
+    rows = _build_finding_memory_descriptions(_risk(conclusive=1, total=3, missing=(
+        MissingSignal(subject_urn="urn:li:dataset:x", missing="operation.lastUpdatedTimestamp"),
+    )))
+    headline = rows[0]
+    assert "CLEAR so far" in headline
+    assert "1/3" in headline
+
+
+def test_headline_says_not_assessed_when_nothing_was_conclusive():
+    rows = _build_finding_memory_descriptions(_risk(conclusive=0, total=3, missing=(
+        MissingSignal(subject_urn="urn:li:dataset:x", missing="operation.lastUpdatedTimestamp"),
+    )))
+    assert "NOT ASSESSED" in rows[0]
+    assert "0/3" in rows[0]
+
+
+def test_coverage_gaps_name_the_missing_aspect_and_its_subject():
+    rows = _build_finding_memory_descriptions(_risk(conclusive=2, total=3, missing=(
+        MissingSignal(subject_urn=DATASET_URN, missing="deadreckon.schemaChangedAt"),
+    )))
+    gap_rows = [r for r in rows if "not checked" in r]
+    assert len(gap_rows) == 1
+    assert "deadreckon.schemaChangedAt" in gap_rows[0]
+    assert "b2fd91.order_entry_db.order_entry.customers" in gap_rows[0]
+
+
+def test_same_missing_aspect_across_datasets_collapses_to_one_row():
+    missing = tuple(
+        MissingSignal(subject_urn=f"urn:li:dataset:(urn:li:dataPlatform:snowflake,db.schema.t{i},PROD)",
+                       missing="operation.lastUpdatedTimestamp")
+        for i in range(4)
+    )
+    rows = _build_finding_memory_descriptions(_risk(conclusive=2, total=3, missing=missing))
+
+    gap_rows = [r for r in rows if "not checked" in r]
+    assert len(gap_rows) == 1
+    # Names a few subjects, then counts the rest rather than listing all.
+    assert "db.schema.t0" in gap_rows[0]
+    assert "+1 more" in gap_rows[0]
+
+
+def test_distinct_missing_aspects_get_their_own_rows():
+    rows = _build_finding_memory_descriptions(_risk(conclusive=1, total=3, missing=(
+        MissingSignal(subject_urn=DATASET_URN, missing="operation.lastUpdatedTimestamp"),
+        MissingSignal(subject_urn=TRANSFORM_URN, missing="deadreckon.definitionChangedAt"),
+    )))
+    gap_rows = [r for r in rows if "not checked" in r]
+    assert len(gap_rows) == 2
+
+
+def test_findings_headline_still_reports_coverage():
+    rows = _build_finding_memory_descriptions(_risk(findings=(_finding("D1"),), conclusive=2, total=3))
+    assert "2/3" in rows[0]
