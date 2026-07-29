@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>deadreckon — risk matrix</title>
+  <link rel="icon" href="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+  <style>
+    :root {
+      --bg: #0b0d11;
+      --panel: #11141c;
+      --panel-2: #161a25;
+      --text: #e8eaed;
+      --text-dim: #9aa2b2;
+      --border: #273041;
+      --accent: #60a5fa;
+      --pass: #22c55e;
+      --pass-dim: #14532d;
+      --finding: #ef4444;
+      --finding-dim: #7f1d1d;
+      --unknown: #f59e0b;
+      --unknown-dim: #78350f;
+      --low: #22c55e;
+      --medium: #f59e0b;
+      --high: #ef4444;
+      --clock: #a855f7;
+      --clock-dim: #581c87;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 18px;
+      line-height: 1.35;
+    }
+
+    #app {
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 32px;
+    }
+
+    .loading, .error, .empty {
+      margin: auto;
+      text-align: center;
+      max-width: 720px;
+    }
+
+    .error {
+      color: var(--finding);
+      background: var(--finding-dim);
+      border: 1px solid var(--finding);
+      border-radius: 8px;
+      padding: 20px 28px;
+    }
+
+    .empty { color: var(--text-dim); }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      flex: 0 0 auto;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .brand .subtitle {
+      color: var(--text-dim);
+      font-size: 16px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .meta {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      color: var(--text-dim);
+      font-size: 15px;
+      text-align: right;
+    }
+
+    .file-loader {
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .file-loader input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .file-loader .button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 120ms ease, border-color 120ms ease;
+      white-space: nowrap;
+    }
+
+    .file-loader:hover .button,
+    .file-loader:focus-within .button {
+      background: #1c2130;
+      border-color: var(--accent);
+    }
+
+    .drop-zone {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .drop-zone.drag-over {
+      outline: 2px dashed var(--accent);
+      outline-offset: -4px;
+      border-radius: 12px;
+    }
+
+    .clock-banner {
+      flex: 0 0 auto;
+      background: var(--clock-dim);
+      color: #f3e8ff;
+      border: 1px solid var(--clock);
+      border-radius: 8px;
+      padding: 14px 22px;
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .clock-banner .icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--clock);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      flex: 0 0 auto;
+    }
+
+    .legend {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 14px;
+      font-size: 14px;
+      color: var(--text-dim);
+      flex-wrap: wrap;
+    }
+
+    .legend-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .legend .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .matrix-wrap {
+      flex: 1 1 auto;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: var(--panel-2);
+      color: var(--text-dim);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      text-align: left;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    thead th.model-col { width: 24%; }
+    thead th.risk-col { width: 8%; }
+    thead th.severity-col { width: 10%; }
+    thead th.coverage-col { width: 8%; }
+
+    thead th.detector {
+      text-align: center;
+    }
+
+    thead th.detector .detector-id {
+      display: block;
+      color: var(--text);
+      font-size: 15px;
+      letter-spacing: 0;
+      text-transform: none;
+      margin-top: 2px;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 120ms ease;
+    }
+
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+    tbody tr.at-risk { box-shadow: inset 4px 0 0 var(--high); }
+    tbody tr.unassessable { box-shadow: inset 4px 0 0 var(--unknown); }
+
+    tbody td {
+      padding: 18px;
+      vertical-align: middle;
+    }
+
+    tbody td.model-cell {
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+      min-width: 0;
+    }
+
+    .model-name {
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .model-name:hover { text-decoration: underline; }
+
+    .model-group {
+      display: block;
+      color: var(--text-dim);
+      font-size: 13px;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    .risk {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      font-size: 20px;
+      white-space: nowrap;
+    }
+
+    .coverage {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    .coverage.unassessable { color: var(--unknown); }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border: 1px solid transparent;
+    }
+
+    .badge.severity-high { background: var(--finding-dim); color: #fecaca; border-color: var(--finding); }
+    .badge.severity-medium { background: var(--unknown-dim); color: #fde68a; border-color: var(--unknown); }
+    .badge.severity-low { background: var(--pass-dim); color: #bbf7d0; border-color: var(--pass); }
+
+    .status-cell {
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      min-width: 160px;
+      border: 1px solid transparent;
+    }
+
+    .status .shape {
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      border-radius: 4px;
+      font-size: 16px;
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+
+    .status-pass { background: var(--pass-dim); color: #bbf7d0; border-color: var(--pass); }
+    .status-pass .shape { background: var(--pass); color: #052e16; }
+
+    .status-finding { background: var(--finding-dim); color: #fecaca; border-color: var(--finding); }
+    .status-finding .shape { background: var(--finding); color: #450a0a; }
+
+    .status-insufficient_data { background: var(--unknown-dim); color: #fde68a; border-color: var(--unknown); }
+    .status-insufficient_data .shape { background: var(--unknown); color: #451a03; }
+
+    .empty-cell {
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    .upload-prompt {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      text-align: center;
+      color: var(--text-dim);
+      background: var(--panel);
+      margin-bottom: 16px;
+      transition: border-color 120ms ease, background 120ms ease;
+    }
+
+    .drop-zone.drag-over .upload-prompt {
+      border-color: var(--accent);
+      background: #152033;
+    }
+
+    .upload-prompt strong { color: var(--text); }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    "use strict";
+
+    const DEFAULT_RUN_URL = "../examples/sample-run.json";
+
+    const STATUS_CONFIG = {
+      PASS: { label: "PASS", shape: "✓", class: "status-pass" },
+      FINDING: { label: "FINDING", shape: "✕", class: "status-finding" },
+      INSUFFICIENT_DATA: { label: "INSUFFICIENT DATA", shape: "?", class: "status-insufficient_data" },
+    };
+
+    const app = document.getElementById("app");
+    let currentRun = null;
+    let loadError = null;
+
+    function escapeHtml(str) {
+      if (str == null) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "—";
+      try {
+        const d = new Date(iso);
+        return d.toISOString().replace("T", " ").slice(0, 19) + " UTC";
+      } catch {
+        return String(iso);
+      }
+    }
+
+    function validateRun(data) {
+      if (!data || typeof data !== "object") {
+        throw new Error("Uploaded file is not a JSON object.");
+      }
+      if (typeof data.schema_version !== "string") {
+        throw new Error("Missing schema_version field.");
+      }
+      const major = data.schema_version.split(".")[0];
+      if (major !== "1") {
+        throw new Error(`Unsupported schema version: ${escapeHtml(data.schema_version)}. Expected major version 1.`);
+      }
+      if (!data.run || typeof data.run !== "object") {
+        throw new Error("Missing run metadata.");
+      }
+      if (!Array.isArray(data.models)) {
+        throw new Error("Missing models array.");
+      }
+      if (!data.detectors_meta || typeof data.detectors_meta !== "object") {
+        throw new Error("Missing detectors_meta.");
+      }
+      if (!data.scoring || typeof data.scoring !== "object") {
+        throw new Error("Missing scoring metadata.");
+      }
+    }
+
+    function loadRun(data) {
+      validateRun(data);
+      currentRun = data;
+      loadError = null;
+      render();
+    }
+
+    function setError(message) {
+      loadError = message;
+      render();
+    }
+
+    function readFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          loadRun(parsed);
+        } catch (err) {
+          setError(`Could not parse ${escapeHtml(file.name)}: ${err.message}`);
+        }
+      };
+      reader.onerror = () => setError(`Could not read ${escapeHtml(file.name)}.`);
+      reader.readAsText(file);
+    }
+
+    async function loadDefault() {
+      try {
+        const response = await fetch(DEFAULT_RUN_URL);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data = await response.json();
+        loadRun(data);
+      } catch (err) {
+        loadError = `Default run could not be loaded automatically (${err.message}). Drop a run JSON file below, or use the file picker.`;
+        currentRun = null;
+        render();
+      }
+    }
+
+    function renderStatusCell(status) {
+      const cfg = STATUS_CONFIG[status];
+      if (!cfg) {
+        return `<div class="status" title="Unknown status"><span class="shape">!</span>${escapeHtml(status || "UNKNOWN")}</div>`;
+      }
+      return `<div class="status ${cfg.class}"><span class="shape" aria-hidden="true">${cfg.shape}</span>${cfg.label}</div>`;
+    }
+
+    function renderSeverityBadge(severity) {
+      const sev = String(severity || "").toUpperCase();
+      const map = {
+        HIGH: { cls: "severity-high", icon: "▲" },
+        MEDIUM: { cls: "severity-medium", icon: "◆" },
+        LOW: { cls: "severity-low", icon: "●" },
+      };
+      const cfg = map[sev] || { cls: "severity-low", icon: "●" };
+      return `<span class="badge ${cfg.cls}"><span aria-hidden="true">${cfg.icon}</span>${escapeHtml(sev)}</span>`;
+    }
+
+    function renderMatrix() {
+      const run = currentRun;
+      if (!run) return "";
+
+      const detectors = Array.isArray(run.run.detectors) ? run.run.detectors : [];
+      const meta = run.detectors_meta || {};
+      const scoring = run.scoring || {};
+      const maxScore = typeof scoring.max_possible_score === "number" ? scoring.max_possible_score : 3;
+
+      const headerCols = detectors.map((d) => {
+        const title = (meta[d] && meta[d].title) || d;
+        return `<th class="detector" scope="col">${escapeHtml(d)}<span class="detector-id">${escapeHtml(title)}</span></th>`;
+      }).join("");
+
+      const rows = run.models.map((model) => {
+        const name = escapeHtml(model.name || "Unnamed model");
+        const nameCell = model.url
+          ? `<a class="model-name" href="${escapeHtml(model.url)}" target="_blank" rel="noopener" title="${name}">${name}</a>`
+          : `<span class="model-name" title="${name}">${name}</span>`;
+
+        const group = model.group && model.group.name
+          ? `<span class="model-group">${escapeHtml(model.group.name)}</span>`
+          : "";
+
+        const atRisk = model.tags && model.tags.at_risk === true;
+        const unassessable = model.tags && model.tags.unassessable === true;
+        const rowClass = unassessable ? "unassessable" : atRisk ? "at-risk" : "";
+
+        const scoreVal = typeof model.score === "number" ? model.score.toFixed(1) : "?";
+        const maxVal = Number.isFinite(maxScore) ? maxScore.toFixed(1) : "?";
+
+        const coverageClass = unassessable ? "coverage unassessable" : "coverage";
+
+        const detectorCells = detectors.map((d) => {
+          const detector = model.detectors && model.detectors[d];
+          if (!detector) {
+            return `<td class="status-cell empty-cell">—</td>`;
+          }
+          return `<td class="status-cell">${renderStatusCell(detector.status)}</td>`;
+        }).join("");
+
+        return `
+          <tr class="${rowClass}">
+            <td class="model-cell">${nameCell}${group}</td>
+            <td class="risk">risk=${scoreVal}/${maxVal}</td>
+            <td>${renderSeverityBadge(model.severity)}</td>
+            <td class="${coverageClass}">${escapeHtml((model.coverage && model.coverage.label) || "—")}</td>
+            ${detectorCells}
+          </tr>
+        `;
+      }).join("");
+
+      return `
+        <div class="matrix-wrap">
+          <table role="table" aria-label="Model risk matrix">
+            <thead>
+              <tr>
+                <th class="model-col" scope="col">Model</th>
+                <th class="risk-col" scope="col">Risk</th>
+                <th class="severity-col" scope="col">Severity</th>
+                <th class="coverage-col" scope="col">Coverage</th>
+                ${headerCols}
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || `<tr><td colspan="${4 + detectors.length}" class="empty-cell">No models in this run.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderLegend() {
+      const run = currentRun;
+      if (!run) return "";
+
+      const statuses = Array.isArray(run.scoring && run.scoring.statuses) ? run.scoring.statuses : Object.keys(STATUS_CONFIG);
+      const statusChips = statuses.map((s) => {
+        const cfg = STATUS_CONFIG[s];
+        if (!cfg) return "";
+        return `<span class="chip ${cfg.class}"><span aria-hidden="true">${cfg.shape}</span>${escapeHtml(cfg.label)}</span>`;
+      }).join("");
+
+      const thresholds = run.scoring && run.scoring.severity_thresholds;
+      let thresholdText = "";
+      if (thresholds && typeof thresholds === "object") {
+        const parts = [];
+        if (typeof thresholds.HIGH === "number") parts.push(`HIGH ≥ ${thresholds.HIGH}`);
+        if (typeof thresholds.MEDIUM === "number") parts.push(`MEDIUM ≥ ${thresholds.MEDIUM}`);
+        if (parts.length) thresholdText = ` · thresholds: ${parts.join(", ")}`;
+      }
+
+      return `
+        <div class="legend">
+          <div class="legend-group">
+            <span>Detector states:</span>
+            ${statusChips}
+          </div>
+          <div class="legend-group">
+            <span>Severity:${thresholdText}</span>
+            <span class="chip severity-high">▲ HIGH</span>
+            <span class="chip severity-medium">◆ MEDIUM</span>
+            <span class="chip severity-low">● LOW</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderClockBanner() {
+      const run = currentRun;
+      if (!run || !run.run || !run.run.clock_overridden) return "";
+      const assessed = formatDate(run.run.assessed_at);
+      return `
+        <div class="clock-banner" role="status">
+          <span class="icon" aria-hidden="true">⏱</span>
+          <span>This run's clock was overridden for testing — effective date: ${escapeHtml(assessed)}</span>
+        </div>
+      `;
+    }
+
+    function renderHeader() {
+      const run = currentRun;
+      const assessed = run && run.run ? formatDate(run.run.assessed_at) : "—";
+      const modelCount = run && Array.isArray(run.models) ? run.models.length : 0;
+
+      return `
+        <header>
+          <div class="brand">
+            <h1>deadreckon</h1>
+            <span class="subtitle">Risk matrix · view 4.1</span>
+          </div>
+          <div class="meta">
+            <span>${modelCount} model${modelCount === 1 ? "" : "s"} · ${assessed}</span>
+            <label class="file-loader">
+              <input type="file" accept=".json,application/json" aria-label="Load run JSON file" />
+              <span class="button">📁 Load run JSON</span>
+            </label>
+          </div>
+        </header>
+      `;
+    }
+
+    function renderUploadPrompt() {
+      return `
+        <div class="upload-prompt">
+          <strong>Drag and drop a run JSON file here</strong>, or use the file picker above.
+        </div>
+      `;
+    }
+
+    function render() {
+      if (!currentRun && !loadError) {
+        app.innerHTML = `<div class="loading">Loading run data…</div>`;
+        return;
+      }
+
+      if (loadError && !currentRun) {
+        app.innerHTML = `
+          ${renderHeader()}
+          <div class="drop-zone">
+            <div class="error">${loadError}</div>
+            ${renderUploadPrompt()}
+          </div>
+        `;
+        bindEvents();
+        return;
+      }
+
+      app.innerHTML = `
+        ${renderHeader()}
+        <div class="drop-zone">
+          ${renderClockBanner()}
+          ${renderLegend()}
+          ${renderMatrix()}
+          ${renderUploadPrompt()}
+        </div>
+      `;
+      bindEvents();
+    }
+
+    function bindEvents() {
+      const input = app.querySelector('input[type="file"]');
+      if (input) {
+        input.addEventListener("change", (e) => readFile(e.target.files[0]));
+      }
+
+      const dropZone = app.querySelector(".drop-zone");
+      if (dropZone) {
+        ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+          dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }, false);
+        });
+
+        ["dragenter", "dragover"].forEach((eventName) => {
+          dropZone.addEventListener(eventName, () => dropZone.classList.add("drag-over"), false);
+        });
+
+        ["dragleave", "drop"].forEach((eventName) => {
+          dropZone.addEventListener(eventName, () => dropZone.classList.remove("drag-over"), false);
+        });
+
+        dropZone.addEventListener("drop", (e) => {
+          const file = e.dataTransfer.files[0];
+          if (file) readFile(file);
+        }, false);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      render();
+      loadDefault();
+    });
+  </script>
+</body>
+</html>
