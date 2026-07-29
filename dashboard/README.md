@@ -1,6 +1,6 @@
-# deadreckon dashboard — view 4.1, the risk matrix
+# deadreckon dashboard — views 4.1 (matrix) and 4.2 (ranking & coverage)
 
-A static, self-contained dashboard for one completed deadreckon run. It renders the model × detector risk matrix and makes the system's "honesty about what it did not check" legible at a glance.
+A static, self-contained dashboard for one completed deadreckon run. It can show either the model × detector risk matrix or a risk-versus-coverage scatter view, and makes the system's "honesty about what it did not check" legible at a glance.
 
 ## Run locally
 
@@ -30,13 +30,25 @@ You can also open `dashboard/index.html` directly in a browser, but most browser
 
 Use the **Load run JSON** button in the top-right, or drag and drop a run file anywhere onto the page. Both `examples/sample-run.json` and `examples/sample-run-edge-cases.json` are accepted.
 
-## What it shows
+## Switch views
+
+Use the **Matrix** / **Ranking & Coverage** tabs at the top of the page. Both views render from the same already-loaded run data; switching does not re-read the file.
+
+A permanent banner appears above either view when `run.clock_overridden` is `true`.
+
+## Matrix view (4.1)
 
 - Rows = models, in the order the JSON provides them.
 - Columns = detectors (`D1`, `D2`, `D3`), using the titles from `detectors_meta`.
 - Per row: model name, `risk=X/Y` against `scoring.max_possible_score`, a severity badge, and `coverage.label`.
 - Each detector cell shows a distinct shape + color state: `PASS` (green check), `FINDING` (red cross), and `INSUFFICIENT_DATA` (amber question mark).
-- A permanent banner appears when `run.clock_overridden` is `true`.
+
+## Ranking & Coverage view (4.2)
+
+- A scatter plot with risk on the horizontal axis (`0` to `scoring.max_possible_score`) and coverage on the vertical axis (`0/3` to `3/3`, read from `coverage.label`).
+- Every model is positioned by both dimensions at once, with its name labeled next to its point.
+- The bottom band is shaded and labeled **"Unverified — not the same as safe"** so a model with `score=0.0` and `coverage=0/3` is immediately distinguishable from a model with `score=0.0` and `coverage=3/3`.
+- Point shape and color indicate the model's status: fully checked/clean, at risk, finding-but-not-at-risk, or unassessable.
 
 ## Notes
 

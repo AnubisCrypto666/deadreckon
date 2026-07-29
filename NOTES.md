@@ -928,6 +928,42 @@ komendy — tego też nie widzę).
 - Nie wywołałem `WebFetch` ani `WebSearch` ani żadnego innego serwera MCP
   poza `datahub` w tej sesji.
 
+## TODO dashboard (odłożone)
+
+- 2026-07-29: **Domyślny fixture ma zostać wbudowany bezpośrednio w
+  `dashboard/index.html` jako literał** (embedded JSON), żeby dwuklik na
+  pliku działał od razu, bez serwera HTTP. Wczytywanie innego pliku
+  (drag & drop / file picker) zostaje dokładnie jak jest teraz — jako
+  podmiana domyślnych danych, nie jedyny sposób wczytania czegokolwiek.
+  **Powód:** obecnie strona domyślnie robi
+  `fetch("../examples/sample-run.json")`, co pod `file://` blokuje CORS
+  (przeglądarka odmawia fetch), więc samo otwarcie pliku dwuklikiem
+  pokazuje błąd wczytywania i wymaga ręcznego odpalenia serwera
+  (`npx serve .` / `python -m http.server`, patrz `dashboard/README.md`).
+  Instrukcja "najpierw uruchom serwer" zmniejsza szansę, że sędzia w
+  ogóle zobaczy dashboard.
+  **Zakres i timing:** robimy to w paczce poprawek **po widoku 4.3**, nie
+  teraz. Widok 4.1 jest już zamknięty i scommitowany (`68d4292`) — nie
+  otwierać/nie modyfikować go w tym celu przed tamtym momentem.
+
+## Notatki do skryptu wideo (Prompt C)
+
+- 2026-07-29: **Widok 4.2 (Ranking & Coverage) — kolejność ujęć.** Na
+  `examples/sample-run.json` strefa "UNVERIFIED — NOT THE SAME AS SAFE"
+  jest **pusta**, i to jest zaleta, nie brak: pokazuje, że pole istnieje
+  z zasady (żaden model w prawdziwym fixture'cie akurat go nie
+  potrzebuje), a nie zostało dorysowane pod jeden konkretny przypadek.
+  Efekt "wow" tego widoku pojawia się dopiero po podmianie pliku na
+  `examples/sample-run-edge-cases.json` — punkt `session_ltv_predictor_v2`
+  (score 0.0, coverage 0/3, `tags.unassessable: true`) wpada w tę strefę
+  na oczach widza, obok punktów, które mają ten sam score 0.0 z innego
+  powodu (`taxi_fare_predictor_v1`, pełne pokrycie).
+  **Scenariusz nagrania:** pokazać oba stany po kolei — najpierw czysty
+  przebieg na `sample-run.json` (strefa pusta, widać że pole istnieje
+  z założenia), potem podmiana pliku przez file picker/drag&drop na
+  `sample-run-edge-cases.json` i punkt lądujący w strefie na żywo. Ok.
+  10 sekund kadru na ten fragment.
+
 ## TODO przed finalną wysyłką (8 sierpnia)
 
 - Rotacja tokenu DataHuba: wygenerować nowy access token, unieważnić obecny
