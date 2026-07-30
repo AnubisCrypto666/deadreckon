@@ -1008,6 +1008,20 @@ them before submission.
 
 ## TODO przed finalną wysyłką (8 sierpnia)
 
+- **Finalny test instrukcji z README robimy w świeżym terminalu, z
+  pozabijanymi procesami na porcie 8000** (`lsof -ti:8000 | xargs kill`
+  czy odpowiednik), zanim odpalimy `python3 -m http.server 8000` czy
+  cokolwiek innego z sekcji "Run locally". Powód: 2026-07-30, test
+  fallbacku Pythona w `dashboard/README.md` dał fałszywy pozytyw, bo
+  na porcie 8000 wisiał już serwer z wcześniejszej sesji weryfikacyjnej
+  - `curl` dostał odpowiedź mimo że sama komenda (`python` zamiast
+    `python3`) w ogóle się nie wykonała (`command not found`). Bez
+  zabicia tego procesu testowalibyśmy własne, przypadkowe środowisko,
+  nie to, co faktycznie jest w instrukcji. Fix (`python3`) już
+  scommitowany (`97155f4`), ale sam test trzeba powtórzyć czysto przed
+  wysyłką, żeby mieć pewność, że to nie jest jedyne miejsce, gdzie
+  środowisko dewelopera maskuje błąd instrukcji.
+
 - Rotacja tokenu DataHuba: wygenerować nowy access token, unieważnić obecny
   (ten używany w tej sesji). Powód: zamaskowane fragmenty tokenu (eyJh...t-_Q)
   przewinęły się przez logi CLI kilkukrotnie podczas developmentu (patrz sekcja

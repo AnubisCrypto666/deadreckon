@@ -85,7 +85,25 @@ the model they concern:
 This is the part of the project most directly aimed at this
 hackathon's own "contribute back to the graph" criterion, and it's
 designed to be seen, not just asserted in a README — the dashboard's
-own deep-links land exactly here.
+own deep-links land exactly here. Since that's the highest-weighted
+claim in this project, it shouldn't require running anything to check —
+so here it is, live, on `customer_churn_predictor_v2`:
+
+<p align="center">
+  <img src="docs/screenshots/datahub-writeback-tag.png" alt="customer_churn_predictor_v2 in DataHub, showing the undertow:at-risk tag" width="800">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/datahub-writeback-documentation.png" alt="customer_churn_predictor_v2's Documentation tab in DataHub, showing three [deadreckon] notes" width="800">
+</p>
+
+*Both screenshots are from a real, live DataHub instance running this
+project's actual seeded data and actual writeback — not a mockup or a
+design comp. Note the third `[deadreckon]` note in the second
+screenshot: it states what wasn't checked (`operation.lastUpdatedTimestamp`
+absent on two upstream datasets), not just what was found — the same
+three-state honesty the dashboard shows, written directly onto the
+entity in DataHub.*
 
 ## Architecture
 
