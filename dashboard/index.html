@@ -627,6 +627,330 @@
       clip: rect(0, 0, 0, 0);
       border: 0;
     }
+
+    .status-cell {
+      cursor: pointer;
+    }
+
+    .status-cell:hover .status {
+      filter: brightness(1.15);
+    }
+
+    .status-cell:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+      border-radius: 4px;
+    }
+
+    .drilldown-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      animation: fadeIn 120ms ease;
+    }
+
+    .drilldown-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+    }
+
+    .drilldown-modal {
+      position: relative;
+      width: 100%;
+      max-width: 920px;
+      max-height: calc(100vh - 80px);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: slideUp 150ms ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .drilldown-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      appearance: none;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      font-size: 18px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      z-index: 2;
+    }
+
+    .drilldown-close:hover,
+    .drilldown-close:focus {
+      color: var(--text);
+      border-color: var(--accent);
+      outline: none;
+    }
+
+    .drilldown-header {
+      flex: 0 0 auto;
+      padding: 24px 28px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .drilldown-model {
+      font-size: 22px;
+      font-weight: 800;
+      word-break: break-word;
+      padding-right: 48px;
+    }
+
+    .drilldown-model a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .drilldown-model a:hover {
+      text-decoration: underline;
+    }
+
+    .drilldown-meta {
+      margin-top: 6px;
+      color: var(--text-dim);
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .drilldown-status-wrap {
+      margin-top: 12px;
+    }
+
+    .drill-status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border: 1px solid transparent;
+    }
+
+    .drill-status.status-pass { background: var(--pass-dim); color: #bbf7d0; border-color: var(--pass); }
+    .drill-status.status-finding { background: var(--finding-dim); color: #fecaca; border-color: var(--finding); }
+    .drill-status.status-insufficient_data { background: var(--unknown-dim); color: #fde68a; border-color: var(--unknown); }
+
+    .drilldown-body {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding: 24px 28px;
+    }
+
+    .pass-state {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .pass-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--pass);
+      color: #052e16;
+      font-size: 32px;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 16px;
+    }
+
+    .pass-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #bbf7d0;
+      margin-bottom: 6px;
+    }
+
+    .pass-detail {
+      color: var(--text-dim);
+      font-size: 17px;
+    }
+
+    .finding-card {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+    }
+
+    .finding-card:last-child {
+      margin-bottom: 0;
+    }
+
+    .finding-summary {
+      margin: 0 0 12px;
+      font-size: 17px;
+      line-height: 1.45;
+    }
+
+    .finding-subject {
+      font-size: 15px;
+      margin-bottom: 8px;
+      word-break: break-word;
+    }
+
+    .finding-subject a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .finding-subject a:hover {
+      text-decoration: underline;
+    }
+
+    .ignition-line {
+      font-size: 14px;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+      word-break: break-word;
+    }
+
+    .ignition-line a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .ignition-line a:hover {
+      text-decoration: underline;
+    }
+
+    .meta-label {
+      color: var(--text-dim);
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-right: 4px;
+    }
+
+    .evidence-list {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 10px 20px;
+      margin: 14px 0 0;
+    }
+
+    .evidence-list dt {
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 14px;
+      text-align: right;
+    }
+
+    .evidence-list dd {
+      margin: 0;
+      color: var(--text);
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .urn-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+    }
+
+    .urn-link:hover {
+      text-decoration: underline;
+    }
+
+    .urn-text {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+      color: var(--text-dim);
+      background: var(--panel);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .gap-group {
+      margin-bottom: 18px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+
+    .gap-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .gap-header {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      word-break: break-word;
+    }
+
+    .gap-subjects {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .gap-subject {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .gap-subject:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .subject-urn {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+      margin-bottom: 4px;
+      word-break: break-word;
+    }
+
+    .subject-urn a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .subject-urn a:hover {
+      text-decoration: underline;
+    }
+
+    .subject-detail {
+      color: var(--text-dim);
+      font-size: 14px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
@@ -647,6 +971,7 @@
     let currentRun = null;
     let loadError = null;
     let currentView = "matrix";
+    let activeDrilldown = null;
 
     function escapeHtml(str) {
       if (str == null) return "";
@@ -737,7 +1062,204 @@
 
     function setView(view) {
       currentView = view;
+      closeDrilldown();
       render();
+    }
+
+    function buildLineageUrlMap(lineagePath) {
+      const map = {};
+      if (Array.isArray(lineagePath)) {
+        lineagePath.forEach((node) => {
+          if (node && node.urn != null) {
+            map[node.urn] = node.url || null;
+          }
+        });
+      }
+      return map;
+    }
+
+    function urnLink(urn, lineageMap) {
+      const url = lineageMap && lineageMap[urn];
+      if (url) {
+        return `<a class="urn-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(urn)}</a>`;
+      }
+      return `<code class="urn-text">${escapeHtml(urn)}</code>`;
+    }
+
+    function renderEvidenceRows(detector, evidence, lineageMap) {
+      const e = evidence || {};
+      const rows = [];
+      if (detector === "D1") {
+        rows.push({ label: "Frozen source", html: urnLink(e.dataset_urn, lineageMap) });
+        rows.push({ label: "Last real update", html: escapeHtml(formatDate(e.dataset_last_updated)) });
+        rows.push({ label: "Frozen for", html: `${escapeHtml(e.frozen_days)} days` });
+        rows.push({ label: "Latest training run", html: escapeHtml(formatDate(e.latest_training_run_at)) });
+      } else if (detector === "D2") {
+        rows.push({ label: "Feature", html: urnLink(e.feature_urn, lineageMap) });
+        const source = e.source_column
+          ? `${escapeHtml(e.source_column)}, on dataset ${urnLink(e.dataset_urn, lineageMap)}`
+          : urnLink(e.dataset_urn, lineageMap);
+        rows.push({ label: "Source column", html: source });
+        rows.push({ label: "Schema changed", html: escapeHtml(formatDate(e.schema_changed_at)) });
+        rows.push({ label: "Missing for", html: `${escapeHtml(e.missing_days)} days` });
+        rows.push({ label: "Latest training run", html: escapeHtml(formatDate(e.latest_training_run_at)) });
+      } else if (detector === "D3") {
+        rows.push({ label: "Transformation", html: urnLink(e.transformation_dataset_urn, lineageMap) });
+        rows.push({ label: "Feature source", html: urnLink(e.feature_source_dataset_urn, lineageMap) });
+        rows.push({ label: "Definition changed", html: escapeHtml(formatDate(e.definition_changed_at)) });
+        rows.push({ label: "Changed", html: `${escapeHtml(e.changed_days)} days ago` });
+        rows.push({ label: "Latest training run", html: escapeHtml(formatDate(e.latest_training_run_at)) });
+      } else {
+        for (const [key, value] of Object.entries(e)) {
+          rows.push({ label: key, html: escapeHtml(value) });
+        }
+      }
+      return rows;
+    }
+
+    function renderIgnition(lineagePath) {
+      const node = Array.isArray(lineagePath) ? lineagePath.find((n) => n && n.ignition === true) : null;
+      if (!node) return "";
+      const name = escapeHtml(node.name || node.urn || "");
+      const link = node.url
+        ? `<a href="${escapeHtml(node.url)}" target="_blank" rel="noopener">${name}</a>`
+        : `<span class="ignition-name">${name}</span>`;
+      return `<div class="ignition-line"><span class="meta-label">Ignition:</span> ${link}</div>`;
+    }
+
+    function closeDrilldown() {
+      if (activeDrilldown) {
+        activeDrilldown.remove();
+        activeDrilldown = null;
+      }
+      document.removeEventListener("keydown", onDrilldownKey);
+    }
+
+    function onDrilldownKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeDrilldown();
+      }
+    }
+
+    function openDrilldown(modelUrn, detectorKey) {
+      if (!currentRun) return;
+      const model = currentRun.models.find((m) => m.urn === modelUrn);
+      if (!model) return;
+      const detector = model.detectors && model.detectors[detectorKey];
+      if (!detector) return;
+
+      closeDrilldown();
+
+      const run = currentRun;
+      const meta = run.detectors_meta || {};
+      const scoring = run.scoring || {};
+      const maxScore = typeof scoring.max_possible_score === "number" ? scoring.max_possible_score : 3;
+
+      const modelNameHtml = model.url
+        ? `<a href="${escapeHtml(model.url)}" target="_blank" rel="noopener">${escapeHtml(model.name || "Unnamed model")}</a>`
+        : escapeHtml(model.name || "Unnamed model");
+      const scoreVal = typeof model.score === "number" ? model.score.toFixed(1) : "?";
+      const maxVal = Number.isFinite(maxScore) ? maxScore.toFixed(1) : "?";
+      const coverageLabel = escapeHtml((model.coverage && model.coverage.label) || "—");
+      const detectorTitle = escapeHtml((meta[detectorKey] && meta[detectorKey].title) || detectorKey);
+
+      const statusCfg = STATUS_CONFIG[detector.status];
+      const statusBadge = statusCfg
+        ? `<span class="drill-status ${statusCfg.class}"><span aria-hidden="true">${statusCfg.shape}</span>${statusCfg.label}</span>`
+        : `<span class="drill-status">${escapeHtml(detector.status || "UNKNOWN")}</span>`;
+
+      let bodyHtml = "";
+      if (detector.status === "PASS") {
+        const subjectsChecked = typeof detector.subjects_checked === "number" ? detector.subjects_checked : 0;
+        bodyHtml = `
+          <div class="pass-state">
+            <div class="pass-icon" aria-hidden="true">✓</div>
+            <div class="pass-title">No findings</div>
+            <div class="pass-detail">${subjectsChecked} subject${subjectsChecked === 1 ? "" : "s"} checked</div>
+          </div>
+        `;
+      } else if (detector.status === "INSUFFICIENT_DATA") {
+        const gaps = Array.isArray(detector.coverage_gaps) ? detector.coverage_gaps : [];
+        const gapsHtml = gaps.map((gap) => {
+          const subjects = Array.isArray(gap.subjects) ? gap.subjects : [];
+          const subjectsHtml = subjects.map((s) => {
+            const urnText = escapeHtml(s.urn || "");
+            const urnHtml = s.url
+              ? `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${urnText}</a>`
+              : `<code class="urn-text">${urnText}</code>`;
+            return `<li class="gap-subject"><div class="subject-urn">${urnHtml}</div><div class="subject-detail">${escapeHtml(s.detail || "")}</div></li>`;
+          }).join("");
+          return `
+            <div class="gap-group">
+              <div class="gap-header"><span class="meta-label">${escapeHtml(gap.aspect || "")}</span> · ${escapeHtml(gap.count)} subject${gap.count === 1 ? "" : "s"}</div>
+              <ul class="gap-subjects">${subjectsHtml || "<li class=\"empty-cell\">No subjects listed.</li>"}</ul>
+            </div>
+          `;
+        }).join("");
+        bodyHtml = gapsHtml || `<div class="empty-cell">No coverage gaps recorded.</div>`;
+      } else if (detector.status === "FINDING") {
+        const findings = Array.isArray(detector.findings) ? detector.findings : [];
+        bodyHtml = findings.map((finding) => {
+          const lineageMap = buildLineageUrlMap(finding.lineage_path);
+          const subjectText = escapeHtml(finding.subject || finding.subject_urn || "");
+          const subjectHtml = finding.subject_url
+            ? `<a href="${escapeHtml(finding.subject_url)}" target="_blank" rel="noopener">${subjectText}</a>`
+            : `<span>${subjectText}</span>`;
+          const rowsHtml = renderEvidenceRows(finding.detector, finding.evidence, lineageMap)
+            .map((r) => `<dt>${escapeHtml(r.label)}</dt><dd>${r.html}</dd>`)
+            .join("");
+          return `
+            <div class="finding-card">
+              <p class="finding-summary">${escapeHtml(finding.summary || "")}</p>
+              <div class="finding-subject"><span class="meta-label">Subject:</span> ${subjectHtml}</div>
+              ${renderIgnition(finding.lineage_path)}
+              <dl class="evidence-list">${rowsHtml}</dl>
+            </div>
+          `;
+        }).join("");
+        bodyHtml = bodyHtml || `<div class="empty-cell">No findings recorded.</div>`;
+      } else {
+        bodyHtml = `<div class="empty-cell">Unknown detector status: ${escapeHtml(detector.status || "")}</div>`;
+      }
+
+      const overlay = document.createElement("div");
+      overlay.id = "drilldown-overlay";
+      overlay.className = "drilldown-overlay";
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      overlay.setAttribute("aria-label", `${detectorTitle} drilldown for ${escapeHtml(model.name || "Unnamed model")}`);
+      overlay.innerHTML = `
+        <div class="drilldown-backdrop" aria-hidden="true"></div>
+        <div class="drilldown-modal">
+          <button type="button" class="drilldown-close" aria-label="Close drilldown">✕</button>
+          <div class="drilldown-header">
+            <div class="drilldown-model">${modelNameHtml}</div>
+            <div class="drilldown-meta">risk=${scoreVal}/${maxVal} · coverage=${coverageLabel} · ${detectorTitle}</div>
+            <div class="drilldown-status-wrap">${statusBadge}</div>
+          </div>
+          <div class="drilldown-body">${bodyHtml}</div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+      activeDrilldown = overlay;
+
+      const closeBtn = overlay.querySelector(".drilldown-close");
+      if (closeBtn) closeBtn.focus();
+
+      closeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeDrilldown();
+      });
+
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay || e.target.classList.contains("drilldown-backdrop")) {
+          closeDrilldown();
+        }
+      });
+
+      document.addEventListener("keydown", onDrilldownKey);
     }
 
     function renderStatusCell(status) {
@@ -797,7 +1319,8 @@
           if (!detector) {
             return `<td class="status-cell empty-cell">—</td>`;
           }
-          return `<td class="status-cell">${renderStatusCell(detector.status)}</td>`;
+          const detectorTitle = escapeHtml((meta[d] && meta[d].title) || d);
+          return `<td class="status-cell" role="button" tabindex="0" aria-label="Open ${detectorTitle} drilldown for ${escapeHtml(model.name || "Unnamed model")}" data-model-urn="${escapeHtml(model.urn)}" data-detector="${escapeHtml(d)}">${renderStatusCell(detector.status)}</td>`;
         }).join("");
 
         return `
@@ -1101,6 +1624,7 @@
     }
 
     function render() {
+      closeDrilldown();
       if (!currentRun && !loadError) {
         app.innerHTML = `<div class="loading">Loading run data…</div>`;
         return;
@@ -1162,6 +1686,17 @@
           if (file) readFile(file);
         }, false);
       }
+
+      const cells = app.querySelectorAll(".status-cell[data-model-urn]");
+      cells.forEach((cell) => {
+        cell.addEventListener("click", () => openDrilldown(cell.dataset.modelUrn, cell.dataset.detector));
+        cell.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openDrilldown(cell.dataset.modelUrn, cell.dataset.detector);
+          }
+        });
+      });
     }
 
     document.addEventListener("DOMContentLoaded", () => {

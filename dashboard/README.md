@@ -1,6 +1,6 @@
-# deadreckon dashboard — views 4.1 (matrix) and 4.2 (ranking & coverage)
+# deadreckon dashboard — views 4.1 (matrix), 4.2 (ranking & coverage), and 4.3 (drill-down)
 
-A static, self-contained dashboard for one completed deadreckon run. It can show either the model × detector risk matrix or a risk-versus-coverage scatter view, and makes the system's "honesty about what it did not check" legible at a glance.
+A static, self-contained dashboard for one completed deadreckon run. It shows the model × detector risk matrix, a risk-versus-coverage scatter view, and a per-cell finding drill-down, all to make the system's "honesty about what it did not check" legible at a glance.
 
 ## Run locally
 
@@ -49,6 +49,14 @@ A permanent banner appears above either view when `run.clock_overridden` is `tru
 - Every model is positioned by both dimensions at once, with its name labeled next to its point.
 - The bottom band is shaded and labeled **"Unverified — not the same as safe"** so a model with `score=0.0` and `coverage=0/3` is immediately distinguishable from a model with `score=0.0` and `coverage=3/3`.
 - Point shape and color indicate the model's status: fully checked/clean, at risk, finding-but-not-at-risk, or unassessable.
+
+## Drill-down view (4.3)
+
+- Click any detector cell in the Matrix view to open a drill-down for that model × detector.
+- `FINDING` cells show every finding: the full summary, the linked subject (when `subject_url` is present), and the evidence fields with human-readable, per-detector labels.
+- `PASS` cells show **"No findings — N subjects checked"** to make a clean, fully checked result a first-class outcome.
+- `INSUFFICIENT_DATA` cells show the grouped `coverage_gaps`: the missing aspect, count, and each subject (linked when a URL is present).
+- Deep links are only ever built from `url` values already present in the run JSON (`model.url`, `finding.subject_url`, `lineage_path[].url`, `coverage_gaps[].subjects[].url`). URNs without a matching URL are rendered as plain monospace text.
 
 ## Notes
 
