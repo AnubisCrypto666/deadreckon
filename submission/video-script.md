@@ -1,10 +1,11 @@
 # deadreckon — video script
 
-**Target run time: 2:43, hard cap 3:00.** Written for one person
+**Target run time: 2:33, hard cap 3:00.** Written for one person
 reading from the screen and clicking with one hand — every beat names
-the exact click. Timings are narration-read estimates; the ~17s margin
-to the cap is deliberate, since a live take with real clicks and
-transitions always runs longer than a silent read of this script.
+the exact click. Timings are narration-read estimates; the ~27s margin
+to the cap is deliberate and lives in the script, not in on-the-day
+discipline — a live take with real clicks and transitions always runs
+longer than a silent read.
 
 Two shots below are marked **[NOTES]** — they come directly from
 `NOTES.md`'s video-script notes and are the two moments this script is
@@ -150,27 +151,28 @@ especially the one stating what wasn't checked.
 
 ---
 
-## 8. Architecture + open-source contributions — 1:55–2:35 (40s)
+## 8. Architecture + open-source contributions — 1:55–2:25 (30s)
 
-**On screen:** the architecture slide/diagram (from `README.md`), then
-a slide or split-screen with the two filed GitHub issues
+Full architecture diagram is in `README.md` — a judge who wants it will
+find it there. This beat is one sentence per topic, not a diagram
+walkthrough.
+
+**On screen:** a brief flash of the README's architecture section
+(2–3s), then a simple text overlay naming the two filed issues
 (`#18657`, `#18675`).
 
 **Voiceover:**
 
-> Under the hood: DataHub Core holds the ML lineage — features,
-> training runs, models — read through the DataHub MCP server. Three
-> detectors run entirely on that metadata, score by weight and blast
-> radius, and write findings straight back into the graph you just saw.
->
-> Building this also surfaced two real DataHub bugs, both filed
-> upstream: a zombie-process leak that crashes OpenSearch about once a
-> day, and a case where the UI's own link to a Document entity 404s.
-> Both are diagnosed, fixed, and documented in this repo.
+> Under the hood, three detectors read DataHub's ML lineage through its
+> MCP server, score by weight and blast radius, and write everything
+> straight back into the graph you just saw — full architecture's in
+> the README. Building this also surfaced two real DataHub bugs, both
+> filed upstream and fixed in this repo: an OpenSearch crash, and a
+> broken Document-entity link.
 
 ---
 
-## 9. Close — 2:35–2:43 (8s)
+## 9. Close — 2:25–2:33 (8s)
 
 **On screen:** repo URL / static end card.
 
@@ -192,9 +194,9 @@ a slide or split-screen with the two filed GitHub issues
 | 5. Swap to edge-cases **[NOTES]** | 12s | 1:13 |
 | 6. Ignition subgraph (swap back first) | 20s | 1:33 |
 | 7. Into DataHub **[NOTES]** | 22s | 1:55 |
-| 8. Architecture + OSS | 40s | 2:35 |
-| 9. Close | 8s | 2:43 |
+| 8. Architecture + OSS (one sentence each) | 30s | 2:25 |
+| 9. Close | 8s | 2:33 |
 
-Scripted at **2:43**, ~17s under the 3:00 cap — the margin is
+Scripted at **2:33**, ~27s under the 3:00 cap — the margin is
 deliberate, not a rounding error; live delivery and click/transition
 time reliably run longer than a silent read of this script.
