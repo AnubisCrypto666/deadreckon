@@ -4,9 +4,9 @@ A static, self-contained dashboard for one completed deadreckon run. It shows th
 
 ## Run locally
 
-No build step and no dependencies. The only requirement is a local static server so the browser can fetch the default run JSON.
+No build step and no dependencies. Open `dashboard/index.html` directly in a browser — the default run is embedded, so it works immediately under the `file://` protocol with no server and no network calls.
 
-From the repo root:
+If you prefer, you can also run a local static server (useful for testing drag-and-drop with a large file):
 
 ```bash
 npx serve .
@@ -21,10 +21,6 @@ python -m http.server 8000
 ```
 
 Then open `http://localhost:8000/dashboard/`.
-
-### Opening the file directly
-
-You can also open `dashboard/index.html` directly in a browser, but most browsers block the default `examples/sample-run.json` fetch under the `file://` protocol. The UI will fall back to a file picker so you can still drop in any run JSON.
 
 ## Load a different run
 
@@ -71,6 +67,6 @@ A permanent banner appears above either view when `run.clock_overridden` is `tru
 
 ## Notes
 
-- Zero network calls other than loading the single local run JSON.
+- Zero network calls on default load; loading a different run via drag-and-drop / file picker uses FileReader, not a network request.
 - Schema major version is validated; only `1.x.x` is accepted.
 - All rendering data comes from the JSON — no hardcoded model names, detector weights, thresholds, or scoring constants.
