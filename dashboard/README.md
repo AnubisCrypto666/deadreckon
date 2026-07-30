@@ -1,6 +1,6 @@
-# deadreckon dashboard — views 4.1 (matrix), 4.2 (ranking & coverage), and 4.3 (drill-down)
+# deadreckon dashboard — views 4.1 (matrix), 4.2 (ranking & coverage), 4.3 (drill-down), and 4.4 (ignition subgraph)
 
-A static, self-contained dashboard for one completed deadreckon run. It shows the model × detector risk matrix, a risk-versus-coverage scatter view, and a per-cell finding drill-down, all to make the system's "honesty about what it did not check" legible at a glance.
+A static, self-contained dashboard for one completed deadreckon run. It shows the model × detector risk matrix, a risk-versus-coverage scatter view, a per-cell finding drill-down, and a compact ignition subgraph inside each FINDING drill-down, all to make the system's "honesty about what it did not check" legible at a glance.
 
 ## Run locally
 
@@ -57,6 +57,17 @@ A permanent banner appears above either view when `run.clock_overridden` is `tru
 - `PASS` cells show **"No findings — N subjects checked"** to make a clean, fully checked result a first-class outcome.
 - `INSUFFICIENT_DATA` cells show the grouped `coverage_gaps`: the missing aspect, count, and each subject (linked when a URL is present).
 - Deep links are only ever built from `url` values already present in the run JSON (`model.url`, `finding.subject_url`, `lineage_path[].url`, `coverage_gaps[].subjects[].url`). URNs without a matching URL are rendered as plain monospace text.
+
+## Ignition subgraph (4.4)
+
+- Inside every `FINDING` drill-down, the plain ignition line is replaced by a compact, fixed horizontal strip of `lineage_path` nodes (upstream → downstream), connected by arrows.
+- Each node shows its type and name; nodes with a `lineage_path[].url` are clickable links, and nodes with `url: null` (e.g. `mlFeature`, `dataProcessInstance`) are plain text.
+- The single ignition node (`ignition: true`) is highlighted in amber and carries a short causal annotation derived from that detector's evidence:
+  - **D1**: `Frozen {frozen_days} day(s) — training kept running`
+  - **D2**: `{source_column} missing {missing_days} day(s) before last training`
+  - **D3**: `Definition changed {changed_days} day(s) before last training`
+- A separate **"Open full lineage in DataHub →"** link below the strip points at the model's own `model.url`.
+- `PASS` and `INSUFFICIENT_DATA` drill-down content is unchanged.
 
 ## Notes
 

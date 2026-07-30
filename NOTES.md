@@ -964,6 +964,18 @@ komendy — tego też nie widzę).
   `sample-run-edge-cases.json` i punkt lądujący w strefie na żywo. Ok.
   10 sekund kadru na ten fragment.
 
+- 2026-07-30: **Osobne ujęcie: zapis do grafu widoczny na żywo w UI
+  DataHuba.** Adresuje wprost premiowane kryterium "contribute back to
+  the graph" — nie może zostać tylko w README/opisie zgłoszenia, musi
+  być pokazane, nie tylko opisane.
+  **Co pokazać:** strona encji `customer_churn_predictor_v2` w DataHub
+  UI — widoczny tag `undertow:at-risk` na encji oraz trzy adnotacje
+  `[deadreckon]` w zakładce Documentation, w tym ta, która mówi wprost,
+  czego detektor **nie** sprawdził (nie tylko co znalazł).
+  **Przejście w kadrze:** dashboard (macierz albo drill-down 4.3) →
+  kliknięcie deep-linku modelu → ta sama encja otwarta w DataHub UI, tak
+  żeby widz zobaczył, że to jeden i ten sam model, nie dwa osobne demo.
+
 ## TODO przed finalną wysyłką (8 sierpnia)
 
 - Rotacja tokenu DataHuba: wygenerować nowy access token, unieważnić obecny

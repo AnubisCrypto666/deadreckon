@@ -764,6 +764,7 @@
       flex: 1 1 auto;
       overflow-y: auto;
       padding: 24px 28px;
+      min-width: 0;
     }
 
     .pass-state {
@@ -828,19 +829,105 @@
       text-decoration: underline;
     }
 
-    .ignition-line {
-      font-size: 14px;
-      color: var(--text-dim);
-      margin-bottom: 10px;
-      word-break: break-word;
+    .ignition-subgraph {
+      margin: 14px 0 10px;
+      padding: 14px 16px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
     }
 
-    .ignition-line a {
-      color: var(--accent);
+    .subgraph-path {
+      display: flex;
+      align-items: stretch;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .subgraph-node {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 84px;
+      max-width: 170px;
+      padding: 8px 12px;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+
+    .subgraph-node.ignition {
+      border-color: var(--unknown);
+      background: rgba(245, 158, 11, 0.1);
+      box-shadow: inset 0 0 0 1px var(--unknown-dim);
+    }
+
+    .subgraph-node a {
+      color: inherit;
       text-decoration: none;
     }
 
-    .ignition-line a:hover {
+    .subgraph-node a:hover {
+      text-decoration: underline;
+    }
+
+    .node-type {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+    }
+
+    .node-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      word-break: normal;
+      overflow-wrap: break-word;
+      line-height: 1.3;
+    }
+
+    .subgraph-node.ignition .node-name {
+      color: #fde68a;
+    }
+
+    .ignition-annotation {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid var(--unknown-dim);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--unknown);
+      line-height: 1.3;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .subgraph-arrow {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      color: var(--text-dim);
+      font-size: 18px;
+      font-weight: 700;
+      padding: 0 2px;
+    }
+
+    .full-lineage-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 12px;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .full-lineage-link:hover {
       text-decoration: underline;
     }
 
@@ -1117,14 +1204,56 @@
       return rows;
     }
 
-    function renderIgnition(lineagePath) {
-      const node = Array.isArray(lineagePath) ? lineagePath.find((n) => n && n.ignition === true) : null;
-      if (!node) return "";
-      const name = escapeHtml(node.name || node.urn || "");
-      const link = node.url
-        ? `<a href="${escapeHtml(node.url)}" target="_blank" rel="noopener">${name}</a>`
-        : `<span class="ignition-name">${name}</span>`;
-      return `<div class="ignition-line"><span class="meta-label">Ignition:</span> ${link}</div>`;
+    function renderCausalAnnotation(detector, evidence) {
+      const e = evidence || {};
+      if (detector === "D1") {
+        return `Frozen ${escapeHtml(e.frozen_days != null ? e.frozen_days : "?")} day(s) — training kept running`;
+      } else if (detector === "D2") {
+        return `${escapeHtml(e.source_column != null ? e.source_column : "?")} missing ${escapeHtml(e.missing_days != null ? e.missing_days : "?")} day(s) before last training`;
+      } else if (detector === "D3") {
+        return `Definition changed ${escapeHtml(e.changed_days != null ? e.changed_days : "?")} day(s) before last training`;
+      }
+      return "";
+    }
+
+    function lineageTypeLabel(type) {
+      const map = {
+        dataset: "Dataset",
+        mlFeature: "Feature",
+        dataProcessInstance: "Run",
+        mlModel: "Model",
+      };
+      return map[type] || (type ? escapeHtml(String(type)) : "Node");
+    }
+
+    function renderIgnition(lineagePath, detector, evidence, modelUrl) {
+      if (!Array.isArray(lineagePath) || lineagePath.length === 0) return "";
+
+      const nodesHtml = lineagePath.map((node, index) => {
+        const isIgnition = node && node.ignition === true;
+        const chipClass = isIgnition ? "subgraph-node ignition" : "subgraph-node";
+        const typeLabel = lineageTypeLabel(node && node.type);
+        const name = escapeHtml(node.name || node.urn || "Unknown");
+        const nameHtml = node.url
+          ? `<a class="node-name" href="${escapeHtml(node.url)}" target="_blank" rel="noopener" title="${name}">${name}</a>`
+          : `<span class="node-name" title="${name}">${name}</span>`;
+        const annotation = isIgnition
+          ? `<span class="ignition-annotation">${escapeHtml(renderCausalAnnotation(detector, evidence))}</span>`
+          : "";
+        const arrow = index > 0 ? `<span class="subgraph-arrow" aria-hidden="true">→</span>` : "";
+        return `${arrow}<div class="${chipClass}"><span class="node-type">${typeLabel}</span>${nameHtml}${annotation}</div>`;
+      }).join("");
+
+      const lineageLink = modelUrl
+        ? `<a class="full-lineage-link" href="${escapeHtml(modelUrl)}" target="_blank" rel="noopener">Open full lineage in DataHub <span aria-hidden="true">→</span></a>`
+        : "";
+
+      return `
+        <div class="ignition-subgraph">
+          <div class="subgraph-path">${nodesHtml}</div>
+          ${lineageLink}
+        </div>
+      `;
     }
 
     function closeDrilldown() {
@@ -1213,7 +1342,7 @@
             <div class="finding-card">
               <p class="finding-summary">${escapeHtml(finding.summary || "")}</p>
               <div class="finding-subject"><span class="meta-label">Subject:</span> ${subjectHtml}</div>
-              ${renderIgnition(finding.lineage_path)}
+              ${renderIgnition(finding.lineage_path, finding.detector, finding.evidence, model.url)}
               <dl class="evidence-list">${rowsHtml}</dl>
             </div>
           `;
