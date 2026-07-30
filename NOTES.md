@@ -976,6 +976,36 @@ komendy — tego też nie widzę).
   kliknięcie deep-linku modelu → ta sama encja otwarta w DataHub UI, tak
   żeby widz zobaczył, że to jeden i ten sam model, nie dwa osobne demo.
 
+## Judge-simulation review (Kimi, read-only, 2026-07-30)
+
+Kimi reviewed the repo cold, as a hackathon judge with ~3 minutes of
+attention, read-only (verified via `git status` afterward — zero files
+touched). Five fixed questions, no code-review/architecture feedback
+requested. Session: `kimi -r session_fb43ec7a-5331-4fdd-9f3d-055c453cc9b7`.
+
+**Answered correctly, no gaps, archived here per instruction (not
+revisited before submission):**
+
+- Q1 (what does the project do): correct two-sentence summary from
+  README + dashboard alone.
+- Q2 (INSUFFICIENT_DATA vs PASS, why it matters): correct, including
+  the "different claims" framing and coverage-as-separate-signal point.
+- Q4, the "did double-click work" half: yes — `open dashboard/index.html`
+  (CLI equivalent of a double-click) opened the dashboard immediately,
+  no server, no install step, no error.
+- Q5 (what's missing to believe it works on real data): correct and
+  matches the project's own disclosed constraints (embedded fixture
+  only in the dashboard; full agent run needs live DataHub + Docker +
+  the separately-cloned nyc-taxi fixture) — not a gap, an accurate
+  read of a limitation this project already discloses.
+
+**The two gaps shown to Jacek separately** (writeback claim only
+verifiable via README prose, not independently from the repo without a
+live DataHub instance; and the `python -m http.server` fallback command
+in `dashboard/README.md` failing on systems with only `python3`) are
+not archived here — see chat for the decision on whether/how to act on
+them before submission.
+
 ## TODO przed finalną wysyłką (8 sierpnia)
 
 - Rotacja tokenu DataHuba: wygenerować nowy access token, unieważnić obecny

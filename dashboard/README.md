@@ -17,7 +17,7 @@ Then open `http://localhost:3000/dashboard/` (or the URL `npx serve` prints).
 If you prefer Python:
 
 ```bash
-python -m http.server 8000
+python3 -m http.server 8000
 ```
 
 Then open `http://localhost:8000/dashboard/`.
