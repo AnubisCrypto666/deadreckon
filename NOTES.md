@@ -1018,17 +1018,26 @@ Link: https://youtu.be/RruTMrAL2lE
 
 Cztery pozycje, w tej kolejności:
 
-1. **Audyt repo w czystym środowisku** — fresh clone (nie lokalny
-   working dir), pozabijane procesy na porcie 8000, przejście README
-   krok po kroku tak jak zrobiłby to sędzia. Dwie ścieżki osobno:
-   dwuklik na `dashboard/index.html`, i pełny setup agenta od zera.
-   Powód: 2026-07-30, test fallbacku Pythona w `dashboard/README.md`
-   dał fałszywy pozytyw, bo na porcie 8000 wisiał już serwer z
-   wcześniejszej sesji weryfikacyjnej — `curl` dostał odpowiedź mimo że
-   sama komenda (`python` zamiast `python3`) w ogóle się nie wykonała
-   (`command not found`). Fix (`python3`) już scommitowany (`97155f4`),
-   ale sam test trzeba powtórzyć czysto, żeby mieć pewność, że to nie
-   jedyne miejsce, gdzie środowisko dewelopera maskuje błąd instrukcji.
+1. ✅ **Audyt repo w czystym środowisku — zamknięte (2026-07-31).**
+   Fresh `git clone` (nie lokalny working dir) do osobnego katalogu,
+   port 8000 pozabijany (znalazł się tam faktycznie osierocony proces z
+   wcześniejszej sesji weryfikacyjnej — dowód, że lekcja z 2026-07-30
+   była realna, nie hipotetyczna). Ścieżka dashboardu (dwuklik,
+   `file://`) potwierdzona w pełni: 5 modeli, zero błędów w konsoli,
+   zero setupu. Ścieżka pełnego agenta zweryfikowana na tyle, na ile
+   szło bez ruszania żywej instancji DataHuba: wszystkie pliki/skrypty
+   z README istnieją pod właściwymi ścieżkami, `uv sync` czysty,
+   `--help` działa na każdym skrypcie, którym README każe sędziemu
+   uruchomić coś. Przy okazji znaleziony i naprawiony realny błąd:
+   `pytest`/`uv run pytest` bez ręcznego `PYTHONPATH=.` failował z
+   czystego klonu (`ModuleNotFoundError: No module named 'detectors'`)
+   — dotąd maskowany tym, że ja zawsze ustawiałem `PYTHONPATH=.` ręcznie.
+   Fix: `[tool.pytest.ini_options] pythonpath = ["."]` w
+   `pyproject.toml`, scommitowane (`c366945`), zweryfikowane: `uv run
+   pytest` przechodzi wszystkie 70 testów bez żadnej zmiennej
+   środowiskowej. **Pełny teardown + odbudowa DataHuba od zera
+   świadomie odłożone na po wysyłce — patrz sekcja "TODO po wysyłce"
+   niżej, decyzja i uzasadnienie z 2026-07-31.**
 
 2. **Skan repo pod kątem sekretów** — tokeny, klucze, `.env`,
    zamaskowane fragmenty w logach/notatkach, w bieżącym stanie **i** w
@@ -1064,3 +1073,17 @@ Cztery pozycje, w tej kolejności:
    Jacek, ja przygotowuję treść i prowadzę.
 
 Na koniec (po tych czterech): checklista do formularza Devpost.
+
+## TODO po wysyłce
+
+- **Pełny teardown i odbudowa DataHuba od zera** — świadomie
+  odłożone, decyzja 2026-07-31. Powód: koszt i ryzyko przewyższają
+  korzyść trzy dni przed wysyłką, a odbudowa wymagałaby odtworzenia
+  całego łańcucha zasiew + fault injection tak, żeby dokładnie pasował
+  do już zacommitowanych zrzutów ekranu (`docs/screenshots/`). Robimy
+  to **po** wysłaniu zgłoszenia: repo zostaje żywe, więc ewentualny
+  błąd w instrukcji, który by się ujawnił, zdąży zostać poprawiony, a
+  same zrzuty ekranu są już plikami w repo i nie zależą od działającej
+  instancji — więc ich dowodowa wartość dla sędziego nie jest zagrożona
+  tym opóźnieniem. Dry-audyt tej ścieżki (bez ruszania żywej instancji)
+  zrobiony 2026-07-31 — patrz punkt 1 wyżej.
