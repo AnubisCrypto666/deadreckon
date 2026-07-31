@@ -1006,31 +1006,61 @@ in `dashboard/README.md` failing on systems with only `python3`) are
 not archived here — see chat for the decision on whether/how to act on
 them before submission.
 
+## Wideo — zamknięte (2026-07-31)
+
+Nagrane, wrzucone na YouTube jako **publiczne**, z napisami
+(autosynchronizacja z tekstu `submission/video-script.md`). Czas
+**2:49**, poniżej limitu 3:00.
+
+Link: https://youtu.be/RruTMrAL2lE
+
 ## TODO przed finalną wysyłką (8 sierpnia)
 
-- **Finalny test instrukcji z README robimy w świeżym terminalu, z
-  pozabijanymi procesami na porcie 8000** (`lsof -ti:8000 | xargs kill`
-  czy odpowiednik), zanim odpalimy `python3 -m http.server 8000` czy
-  cokolwiek innego z sekcji "Run locally". Powód: 2026-07-30, test
-  fallbacku Pythona w `dashboard/README.md` dał fałszywy pozytyw, bo
-  na porcie 8000 wisiał już serwer z wcześniejszej sesji weryfikacyjnej
-  - `curl` dostał odpowiedź mimo że sama komenda (`python` zamiast
-    `python3`) w ogóle się nie wykonała (`command not found`). Bez
-  zabicia tego procesu testowalibyśmy własne, przypadkowe środowisko,
-  nie to, co faktycznie jest w instrukcji. Fix (`python3`) już
-  scommitowany (`97155f4`), ale sam test trzeba powtórzyć czysto przed
-  wysyłką, żeby mieć pewność, że to nie jest jedyne miejsce, gdzie
-  środowisko dewelopera maskuje błąd instrukcji.
+Cztery pozycje, w tej kolejności:
 
-- Rotacja tokenu DataHuba: wygenerować nowy access token, unieważnić obecny
-  (ten używany w tej sesji). Powód: zamaskowane fragmenty tokenu (eyJh...t-_Q)
-  przewinęły się przez logi CLI kilkukrotnie podczas developmentu (patrz sekcja
-  "Audyt sesji 2026-07-26"). Sam token nigdy nie wyciekł w pełnej postaci, ale
-  to tania, standardowa higiena przed publikacją repo - zrobić na końcu, nie
-  teraz, żeby nie przerywać obecnego tokenu w środku prac.
-  Dodatkowa weryfikacja 2026-07-26 (audyt przed pushem commita f02f933):
-  pełna wartość tokenu żyje wyłącznie w `~/.datahubenv`, poza repo, i nigdy
-  nie trafiła do historii gita w żadnej postaci - potwierdzone zarówno przez
-  grep całej historii (`git log --all -p`) pod kątem wzorców tokenu/JWT/
-  URL-i z credentialami (zero trafień poza zamaskowanym `eyJh**********t-_Q`
-  cytowanym w tym samym audycie), jak i niezależnie przez Ciebie w terminalu.
+1. **Audyt repo w czystym środowisku** — fresh clone (nie lokalny
+   working dir), pozabijane procesy na porcie 8000, przejście README
+   krok po kroku tak jak zrobiłby to sędzia. Dwie ścieżki osobno:
+   dwuklik na `dashboard/index.html`, i pełny setup agenta od zera.
+   Powód: 2026-07-30, test fallbacku Pythona w `dashboard/README.md`
+   dał fałszywy pozytyw, bo na porcie 8000 wisiał już serwer z
+   wcześniejszej sesji weryfikacyjnej — `curl` dostał odpowiedź mimo że
+   sama komenda (`python` zamiast `python3`) w ogóle się nie wykonała
+   (`command not found`). Fix (`python3`) już scommitowany (`97155f4`),
+   ale sam test trzeba powtórzyć czysto, żeby mieć pewność, że to nie
+   jedyne miejsce, gdzie środowisko dewelopera maskuje błąd instrukcji.
+
+2. **Skan repo pod kątem sekretów** — tokeny, klucze, `.env`,
+   zamaskowane fragmenty w logach/notatkach, w bieżącym stanie **i** w
+   całej historii commitów, nie tylko HEAD.
+
+3. **Rotacja tokenu DataHuba** — nowy access token, unieważnienie
+   obecnego (tego używanego przez całą tę sesję developerską). Powód:
+   zamaskowane fragmenty tokenu (`eyJh...t-_Q`) przewinęły się przez
+   logi CLI kilkukrotnie podczas developmentu (patrz sekcja "Audyt
+   sesji 2026-07-26"). Sam token nigdy nie wyciekł w pełnej postaci,
+   ale to tania, standardowa higiena przed publikacją repo — robimy na
+   końcu, nie wcześniej, żeby nie przerywać obecnego tokenu w środku
+   prac. Dodatkowa weryfikacja 2026-07-26 (audyt przed pushem commita
+   f02f933): pełna wartość tokenu żyje wyłącznie w `~/.datahubenv`,
+   poza repo, i nigdy nie trafiła do historii gita w żadnej postaci —
+   potwierdzone zarówno przez grep całej historii (`git log --all -p`)
+   pod kątem wzorców tokenu/JWT/URL-i z credentialami (zero trafień
+   poza zamaskowanym `eyJh**********t-_Q` cytowanym w tym samym
+   audycie), jak i niezależnie przez Jacka w terminalu. Ręczna czynność
+   w UI DataHuba — robi ją Jacek, ja tylko prowadzę.
+
+4. **Trzy niezłożone luki w `mcp-server-datahub`** — mamy zapas czasu
+   przed deadline'em, więc je składamy. Materiał źródłowy już w tym
+   pliku (sekcja "2026-07-26: D1-D3 detectors..."): `get_entities`
+   ucina natywne pola osobno dla `mlModel` (brak `hyperParams`,
+   `trainingMetrics`, `mlFeatures`, `groups`, `trainingJobs`), osobno
+   dla `mlFeature` (brak `sources`, `dataType`, `customProperties`), i
+   osobno dla `dataProcessInstance` (prawie nic poza gołym `urn`,
+   `get_lineage` też pokazuje go jako pusty stub bez timestampu). Trzy
+   osobne, niezależnie reprodukowalne zgłoszenia, jedno per typ encji —
+   dodatek do dwóch komentarzy z 28.07 (`#18657`, `#18675`), nie
+   zamiennik. Ręczna czynność (wysyłka z konta GitHub Jacka) — robi ją
+   Jacek, ja przygotowuję treść i prowadzę.
+
+Na koniec (po tych czterech): checklista do formularza Devpost.
